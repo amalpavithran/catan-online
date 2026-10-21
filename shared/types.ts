@@ -42,6 +42,8 @@ export const BUILD_COSTS = {
   devCard: { brick: 0, lumber: 0, wool: 1, grain: 1, ore: 1 },
 } as const satisfies Record<string, ResourceCounts>;
 
+export const MAX_PLAYERS = 6;
+
 export const PIECE_LIMITS = { road: 15, settlement: 5, city: 4 } as const;
 export const VICTORY_POINTS_TO_WIN = 10;
 export const LONGEST_ROAD_MINIMUM = 5;
@@ -98,6 +100,7 @@ export type Phase =
   | 'finished';
 
 export type TradeOffer = {
+  id?: string;
   from: PlayerId;
   give: ResourceCounts;
   want: ResourceCounts;
@@ -121,6 +124,8 @@ export type GameState = {
   turn: number;
   /** Index into `players`. */
   current: number;
+  /** Present only in new 5–6 player games; absent in saved base games. */
+  paired?: { first: number; secondActive: boolean };
   dice: [number, number] | null;
   /** True until this turn's roll happens — a Knight played first must not skip it. */
   mustRoll: boolean;
@@ -135,6 +140,8 @@ export type GameState = {
   /** One development card per turn. */
   playedDevThisTurn: boolean;
   trade: TradeOffer | null;
+  /** Independent offers; optional for saved games from before multi-offer support. */
+  trades?: TradeOffer[];
   longestRoad: { owner: PlayerId | null; length: number };
   largestArmy: { owner: PlayerId | null; size: number };
   winner: PlayerId | null;
@@ -159,9 +166,9 @@ export type Action =
   | { type: 'playMonopoly'; resource: Resource }
   | { type: 'bankTrade'; give: Resource; want: Resource }
   | { type: 'offerTrade'; give: ResourceCounts; want: ResourceCounts }
-  | { type: 'respondTrade'; accept: boolean }
-  | { type: 'acceptTradeWith'; player: PlayerId }
-  | { type: 'cancelTrade' }
+  | { type: 'respondTrade'; accept: boolean; offerId?: string }
+  | { type: 'acceptTradeWith'; player: PlayerId; offerId?: string }
+  | { type: 'cancelTrade'; offerId?: string }
   | { type: 'endTurn' };
 
 export type ActionType = Action['type'];

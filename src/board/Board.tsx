@@ -74,8 +74,8 @@ const hexOrder = (g: BoardGraph): Record<HexId, number> =>
 /** Island extents plus room for the frame and the jetties sticking out to sea. */
 function viewBox(g: BoardGraph): string {
   const ps = Object.values(g.vertices).map((v) => v.pos);
-  const w = Math.max(...ps.map((p) => Math.abs(p.x))) + 70;
-  const h = Math.max(...ps.map((p) => Math.abs(p.y))) + 90;
+  const w = Math.max(...ps.map((p) => Math.abs(p.x))) + 55;
+  const h = Math.max(...ps.map((p) => Math.abs(p.y))) + 60;
   return `${-w} ${-h} ${2 * w} ${2 * h}`;
 }
 

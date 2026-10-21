@@ -1,7 +1,7 @@
 {
   "name": "catan",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,client -c magenta,cyan \"npm:dev:server\" \"npm:dev:client\"",
@@ -11,7 +11,8 @@
     "start": "cross-env NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "simulate": "tsx scripts/simulate.ts"
+    "simulate": "tsx scripts/simulate.ts",
+    "test:dice": "node --import tsx scripts/test-dice.tsx"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -32,6 +33,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
+    "playwright": "1.64.1",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3",
     "vite": "^5.3.3",

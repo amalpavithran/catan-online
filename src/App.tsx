@@ -4,16 +4,15 @@ import { useGame } from './net/useGame';
 import { Entrance } from './ui/Entrance';
 import { HandBar, type Pending } from './ui/HandBar';
 import { Lobby } from './ui/Lobby';
-import { Rail } from './ui/Rail';
+import { GameDetails, Rail } from './ui/Rail';
 import { CardFlights } from './ui/CardFlights';
 import { detectRoll, type RollFx } from './fx/events';
+import { TradesOverlay } from './ui/TradesOverlay';
 import type { PlayerView } from '../shared/redact';
 import {
   DevCardModal,
   DiscardModal,
   StealModal,
-  TradeModal,
-  TradeOfferModal,
   WinnerModal,
   useEscape,
 } from './ui/Modals';
@@ -51,12 +50,8 @@ function Game({ api }: { api: ReturnType<typeof useGame> }) {
 
   // Drop a half-finished choice whenever the game moves on without it.
   useEffect(() => {
-    if (view.phase !== 'main') setPending(null);
-  }, [view.phase, view.turn]);
-
-  useEffect(() => {
-    if (view.trade === null) setShowTrade(false);
-  }, [view.trade]);
+    if (view.phase !== 'main' || !view.moves.isMyTurn) setPending(null);
+  }, [view.phase, view.turn, view.current]);
 
   // Rejected actions surface as a short toast rather than a blocking dialog.
   useEffect(() => {
@@ -94,10 +89,12 @@ function Game({ api }: { api: ReturnType<typeof useGame> }) {
           {view.winner
             ? 'Game over'
             : view.moves.isMyTurn
-              ? 'Your turn'
+              ? view.paired && view.phase !== 'setup' ? `Your turn · Player ${view.paired.secondActive ? 2 : 1}` : 'Your turn'
               : `${current?.name ?? 'Someone'}’s turn`}
         </div>
       </header>
+
+      <Rail view={view} me={api.me} />
 
       <div className="board-stage">
         <BoardView
@@ -121,9 +118,9 @@ function Game({ api }: { api: ReturnType<typeof useGame> }) {
             setPending(null);
           }}
         />
+        <GameDetails view={view} />
+        <TradesOverlay view={view} send={api.send} composing={showTrade} setComposing={setShowTrade} />
       </div>
-
-      <Rail view={view} me={api.me} />
 
       <HandBar
         view={view}
@@ -140,8 +137,6 @@ function Game({ api }: { api: ReturnType<typeof useGame> }) {
 
       <DiscardModal view={view} send={api.send} />
       <StealModal view={view} send={api.send} />
-      <TradeOfferModal view={view} send={api.send} />
-      {showTrade && <TradeModal view={view} send={api.send} onClose={() => setShowTrade(false)} />}
       {showCards && <DevCardModal view={view} send={api.send} onClose={() => setShowCards(false)} />}
       <WinnerModal view={view} onLeave={api.leave} />
 

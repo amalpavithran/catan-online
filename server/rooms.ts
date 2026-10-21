@@ -1,11 +1,12 @@
 import fs from 'node:fs';
+import { randomInt } from 'node:crypto';
 import path from 'node:path';
 import { applyAction, createGame } from '../shared/rules';
 import { viewFor, type PlayerView } from '../shared/redact';
 import { MAPS, isMapId, type MapId } from '../shared/scenario';
 import type { Action, GameState, PlayerId } from '../shared/types';
 
-export const MAX_SEATS = 4;
+export const MAX_SEATS = 6;
 export const MIN_SEATS = 2;
 
 export type Seat = {
@@ -141,6 +142,7 @@ export function joinRoom(code: unknown, name: unknown, socketId: string): { room
     socketId,
   };
   room.seats.push(seat);
+  if (room.seats.length >= 5) room.map = 'large';
   room.updatedAt = Date.now();
   return { room, seat };
 }
@@ -170,11 +172,29 @@ export function startGame(room: Room, playerId: PlayerId): string | null {
   if (room.seats.filter((s) => s.socketId !== null).length < MIN_SEATS) return `You need at least ${MIN_SEATS} players.`;
   dropOfflineSeats(room);
 
+  const openingRolls: string[] = [];
+  if (room.seats.length >= 5) {
+    room.map = 'large';
+    // The official setup chooses the first player by highest dice roll.
+    let tied = [...room.seats];
+    while (tied.length > 1) {
+      const rolls = tied.map(seat => ({seat, roll: randomInt(1, 7) + randomInt(1, 7)}));
+      openingRolls.push(rolls.map(({seat, roll}) => `${seat.name}: ${roll}`).join(', '));
+      const best = Math.max(...rolls.map(r => r.roll));
+      tied = rolls.filter(r => r.roll === best).map(r => r.seat);
+    }
+    const first = room.seats.indexOf(tied[0]);
+    room.seats = [...room.seats.slice(first), ...room.seats.slice(0, first)];
+  }
   room.state = createGame(
     room.seats.map((s) => ({ id: s.playerId, name: s.name })),
     undefined,
     MAPS[room.map],
   );
+  if (openingRolls.length) {
+    room.state.log.unshift({id: 0, turn: 1, player: null,
+      text: `Opening dice (${openingRolls.join('; tie reroll: ')}). ${room.seats[0].name} starts.`});
+  }
   room.updatedAt = Date.now();
   return null;
 }
@@ -183,6 +203,7 @@ export function setMap(room: Room, playerId: PlayerId, map: unknown): string | n
   if (room.hostId !== playerId) return 'Only the host can pick the map.';
   if (room.state) return 'The game has already started.';
   if (!isMapId(map)) return 'No such map.';
+  if (room.seats.length >= 5 && map !== 'large') return 'Five or six players require the Large island map.';
   room.map = map;
   room.updatedAt = Date.now();
   return null;

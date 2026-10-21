@@ -52,17 +52,18 @@ const PIP_LAYOUT: Record<number, [number, number][]> = {
 
 function Die({ value }: { value: number }) {
   return (
-    <div className="die" data-rolling="true" key={value} aria-label={`Die showing ${value}`}>
+    <svg className="die" data-rolling="true" viewBox="0 0 36 36" role="img" aria-label={`Die showing ${value}`}>
+      <rect x="1" y="1" width="34" height="34" rx="6" fill="var(--paper)" stroke="#b5a487" />
       {(PIP_LAYOUT[value] ?? []).map(([row, col], i) => (
-        <span key={i} className="pip" style={{ gridRow: row, gridColumn: col }} />
+        <circle key={i} className="pip" cx={8 + (col - 1) * 10} cy={8 + (row - 1) * 10} r="3" fill="var(--ink)" />
       ))}
-    </div>
+    </svg>
   );
 }
 
 export function Cards({ resources }: { resources: ResourceCounts }) {
   return (
-    <div className="cards">
+    <div className="cards" aria-label="Your resource cards">
       {RESOURCES.map((r) => (
         <div
           key={r}
@@ -71,6 +72,7 @@ export function Cards({ resources }: { resources: ResourceCounts }) {
           style={{ ['--card-color' as string]: RESOURCE_COLOR[r] }}
           data-empty={resources[r] === 0}
           title={`${RESOURCE_NAME[r]}: ${resources[r]}`}
+          role="img" aria-label={`${resources[r]} ${RESOURCE_NAME[r]}`}
         >
           <ResourceGlyph resource={r} />
           {/* Keyed on the count so a change remounts the chip and it pops. */}
@@ -153,7 +155,7 @@ function prompt(view: PlayerView, owed: number): string | null {
     case 'discarding':
       return 'Waiting for everyone to discard.';
     default:
-      return view.freeRoads > 0 ? `Place ${view.freeRoads} free ${view.freeRoads === 1 ? 'road' : 'roads'}.` : null;
+      return view.freeRoads > 0 ? `Place ${view.freeRoads} free ${view.freeRoads === 1 ? 'road' : 'roads'}.` : view.paired?.secondActive ? 'Player 2: build, play a card, or trade with the bank. No dice roll or player trades.' : view.paired ? 'Player 1: trade and build, then pass to Player 2.' : null;
   }
 }
 
@@ -188,12 +190,11 @@ export function HandBar({
 
   return (
     <div className="handbar">
-      <Cards resources={view.you?.resources ?? { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 }} />
-
-      <Dice dice={view.dice} />
-
-      {hint && <p className="prompt">{hint}</p>}
-
+      <div className="hand-status">
+        <Dice dice={view.dice} />
+        {hint && <p className="prompt" role="status">{hint}</p>}
+      </div>
+      <div className="turn-controls">
       <div className="actions">
         {myTurn && view.phase === 'rolling' && (
           <button className="btn btn-primary" onClick={onRoll}>
@@ -242,16 +243,18 @@ export function HandBar({
 
         {inMain && (
           <button className="btn" onClick={openTrade}>
-            Trade
+            {view.paired?.secondActive ? 'Bank trade' : 'Trade'}
           </button>
         )}
 
+      </div>
         {inMain && (
-          <button className="btn btn-primary" onClick={onEndTurn}>
-            End turn
+          <button className="btn btn-primary end-turn" onClick={onEndTurn}>
+            {view.paired && !view.paired.secondActive ? 'Pass to Player 2' : 'End turn'}
           </button>
         )}
       </div>
+      <Cards resources={view.you?.resources ?? { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 }} />
     </div>
   );
 }

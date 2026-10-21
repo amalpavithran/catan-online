@@ -14,7 +14,7 @@ function Scrim({ children }: { children: React.ReactNode }) {
 }
 
 /** A row of five resources with +/- steppers, bounded by `max`. */
-function CountPicker({
+export function CountPicker({
   counts,
   max,
   onChange,
@@ -271,172 +271,6 @@ export function DevCardModal({
   );
 }
 
-export function TradeModal({
-  view,
-  send,
-  onClose,
-}: {
-  view: PlayerView;
-  send: (a: Action) => void;
-  onClose: () => void;
-}) {
-  const held = view.you?.resources ?? emptyCounts();
-  const [give, setGive] = useState<ResourceCounts>(emptyCounts);
-  const [want, setWant] = useState<ResourceCounts>(emptyCounts);
-
-  const offer = view.trade;
-  const mine = offer?.from === view.you?.id;
-
-  // Once an offer is on the table the form is replaced by the responses.
-  if (offer && mine) {
-    return (
-      <Scrim>
-        <h2>Offer on the table</h2>
-        <p className="modal-lede">
-          You give {describe(offer.give)} for {describe(offer.want)}.
-        </p>
-        <div className="responses">
-          {view.players
-            .filter((p) => p.id !== view.you?.id)
-            .map((p) => {
-              const state = offer.responses[p.id] ?? 'pending';
-              return (
-                <div key={p.id} className="response">
-                  <span className="turn-dot" style={{ ['--turn-color' as string]: p.color }} />
-                  <span>{p.name}</span>
-                  <span className="response-state" data-state={state}>
-                    {state === 'accept' ? 'accepted' : state === 'reject' ? 'declined' : 'thinking…'}
-                  </span>
-                  {state === 'accept' && (
-                    <button
-                      className="btn btn-primary"
-                      style={{ padding: '5px 12px' }}
-                      onClick={() => {
-                        send({ type: 'acceptTradeWith', player: p.id });
-                        onClose();
-                      }}
-                    >
-                      Trade
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-        </div>
-        <div className="modal-actions">
-          <button
-            className="btn"
-            onClick={() => {
-              send({ type: 'cancelTrade' });
-              onClose();
-            }}
-          >
-            Withdraw offer
-          </button>
-        </div>
-      </Scrim>
-    );
-  }
-
-  const bankable = RESOURCES.filter((r) => held[r] >= view.moves.bankRates[r]);
-
-  return (
-    <Scrim>
-      <h2>Trade</h2>
-      <p className="modal-lede">Offer a swap to the table, or trade straight with the bank.</p>
-
-      <div className="trade-sides">
-        <div className="trade-side">
-          <h3>You give</h3>
-          <CountPicker counts={give} max={held} onChange={setGive} />
-        </div>
-        <div className="trade-swap">↓ in exchange for ↓</div>
-        <div className="trade-side">
-          <h3>You want</h3>
-          <CountPicker counts={want} max={view.moves.tradeWantMax} onChange={setWant} showHeld={false} />
-        </div>
-      </div>
-
-      <div className="modal-actions" style={{ marginBottom: 22 }}>
-        <button className="btn" onClick={onClose}>
-          Cancel
-        </button>
-        <button
-          className="btn btn-primary"
-          disabled={totalOf(give) === 0 || totalOf(want) === 0 || !view.moves.canOfferTrade}
-          onClick={() => send({ type: 'offerTrade', give, want })}
-        >
-          Offer it
-        </button>
-      </div>
-
-      <h3 style={{ fontSize: 15, marginBottom: 8 }}>Bank and harbours</h3>
-      {bankable.length === 0 ? (
-        <p className="log-empty">
-          You need {Math.min(...RESOURCES.map((r) => view.moves.bankRates[r]))} of one resource to trade with the bank.
-        </p>
-      ) : (
-        <div className="responses">
-          {bankable.map((from) => (
-            <div key={from} className="response">
-              <span style={{ color: RESOURCE_COLOR[from], width: 22, height: 22 }}>
-                <ResourceGlyph resource={from} />
-              </span>
-              <span>
-                {view.moves.bankRates[from]} {RESOURCE_NAME[from].toLowerCase()} for
-              </span>
-              <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                {RESOURCES.filter((to) => to !== from).map((to) => (
-                  <button
-                    key={to}
-                    className="btn"
-                    style={{ padding: '4px 8px' }}
-                    title={`Trade for ${RESOURCE_NAME[to].toLowerCase()}`}
-                    onClick={() => send({ type: 'bankTrade', give: from, want: to })}
-                  >
-                    <span style={{ color: RESOURCE_COLOR[to], width: 18, height: 18, display: 'block' }}>
-                      <ResourceGlyph resource={to} />
-                    </span>
-                  </button>
-                ))}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </Scrim>
-  );
-}
-
-/** Shown to everyone who is not the offering player. */
-export function TradeOfferModal({ view, send }: { view: PlayerView; send: (a: Action) => void }) {
-  const offer = view.trade;
-  if (!offer || !view.moves.mustAnswerTrade) return null;
-  const from = view.players.find((p) => p.id === offer.from);
-
-  return (
-    <Scrim>
-      <h2>{from?.name} wants to trade</h2>
-      <p className="modal-lede">
-        They give {describe(offer.give)} and want {describe(offer.want)} back.
-      </p>
-      <div className="modal-actions">
-        <button className="btn" onClick={() => send({ type: 'respondTrade', accept: false })}>
-          No thanks
-        </button>
-        <button
-          className="btn btn-primary"
-          disabled={!view.moves.canAcceptTrade}
-          onClick={() => send({ type: 'respondTrade', accept: true })}
-        >
-          Accept
-        </button>
-      </div>
-      {!view.moves.canAcceptTrade && <p className="log-empty">You do not hold what they want.</p>}
-    </Scrim>
-  );
-}
-
 /** Held back briefly so the board's victory lap and the confetti get seen first. */
 const WINNER_DELAY_MS = 2600;
 
@@ -480,11 +314,6 @@ export function WinnerModal({ view, onLeave }: { view: PlayerView; onLeave: () =
       )}
     </>
   );
-}
-
-function describe(counts: ResourceCounts): string {
-  const parts = RESOURCES.filter((r) => counts[r] > 0).map((r) => `${counts[r]} ${RESOURCE_NAME[r].toLowerCase()}`);
-  return parts.length ? parts.join(' and ') : 'nothing';
 }
 
 /** Close a modal on Escape — expected of anything that covers the board. */

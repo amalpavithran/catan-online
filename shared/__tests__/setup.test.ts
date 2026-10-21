@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { BOARD, hexDistance, parseHexId } from '../layout';
 import { makeRng } from '../rng';
-import { generateBoard } from '../setup';
-import { BASE_GAME, BEGINNER, MAPS, RED_TOKENS, graphFor } from '../scenario';
+import { generateBoard, spiralHexes } from '../setup';
+import { BASE_GAME, BEGINNER, LARGE, MAPS, RED_TOKENS, graphFor } from '../scenario';
 
 const boards = Array.from({ length: 300 }, (_, i) => generateBoard(makeRng(i + 1)));
 
@@ -84,4 +84,15 @@ describe('maps', () => {
     expect(generateBoard(makeRng(1), BEGINNER).hexes).toEqual(generateBoard(makeRng(2), BEGINNER).hexes);
     expect(generateBoard(makeRng(1), BEGINNER).hexes['0,0'].terrain).toBe('desert');
   });
+});
+
+
+it('deals the extension A–Zc sequence counterclockwise, skipping both deserts', () => {
+  const path=spiralHexes(LARGE);
+  expect(new Set(path).size).toBe(30);
+  for(let i=1;i<path.length;i++)expect(hexDistance(parseHexId(path[i-1]),parseHexId(path[i]))).toBe(1);
+  for(let seed=1;seed<=50;seed++){
+    const b=generateBoard(makeRng(seed),LARGE);
+    expect(path.filter(h=>b.hexes[h].terrain!=='desert').map(h=>b.hexes[h].token)).toEqual(LARGE.spiralTokens);
+  }
 });

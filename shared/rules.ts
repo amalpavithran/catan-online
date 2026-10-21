@@ -1,9 +1,10 @@
 import { type EdgeId, type HexId, type VertexId } from './layout';
 import { makeRng, nextInt, rollDie, shuffle } from './rng';
-import { BASE_GAME, graphOf, type Scenario } from './scenario';
+import { BASE_GAME, LARGE, graphOf, type Scenario } from './scenario';
 import { generateBoard } from './setup';
 import {
   BUILD_COSTS,
+  MAX_PLAYERS,
   HAND_LIMIT_BEFORE_DISCARD,
   LARGEST_ARMY_MINIMUM,
   LONGEST_ROAD_MINIMUM,
@@ -16,6 +17,7 @@ import {
   type Action,
   type DevCardType,
   type GameState,
+  type TradeOffer,
   type Player,
   type PlayerId,
   type Resource,
@@ -33,7 +35,7 @@ const DEV_DECK: readonly { type: DevCardType; count: number }[] = [
   { type: 'monopoly', count: 2 },
 ];
 
-export const PLAYER_COLORS = ['#d9534f', '#3b7dd8', '#e8a33d', '#4aa96c'] as const;
+export const PLAYER_COLORS = ['#d9534f', '#3b7dd8', '#e8a33d', '#4aa96c', '#f2eee2', '#986442'] as const;
 
 const BANK_PER_RESOURCE = 19;
 
@@ -43,6 +45,18 @@ const BANK_PER_RESOURCE = 19;
 
 export function playerById(state: GameState, id: PlayerId): Player | undefined {
   return state.players.find((p) => p.id === id);
+}
+
+/** Keep old saved games and clients compatible while each new offer has its own id. */
+export function openTrades(state: GameState): TradeOffer[] {
+  return state.trades ?? (state.trade ? [state.trade] : []);
+}
+function setTrades(state: GameState, offers: TradeOffer[]): void {
+  state.trades = offers;
+  state.trade = offers[0] ?? null;
+}
+function selectedTrade(state: GameState, id?: string): TradeOffer | undefined {
+  return id === undefined ? openTrades(state)[0] : openTrades(state).find(o => (o.id ?? 'legacy') === id);
 }
 
 function currentPlayer(state: GameState): Player {
@@ -261,9 +275,16 @@ export function createGame(
   seed?: number,
   scenario: Scenario = BASE_GAME,
 ): GameState {
+  if (seats.length < 2 || seats.length > MAX_PLAYERS) throw new Error('Games require 2–6 players.');
+  const extended = seats.length >= 5;
+  if (extended) scenario = LARGE;
   const rng = makeRng(seed);
   const deck: DevCardType[] = [];
   for (const { type, count } of DEV_DECK) for (let i = 0; i < count; i++) deck.push(type);
+
+  if (extended) {
+    deck.push(...Array<DevCardType>(6).fill('knight'), 'roadBuilding', 'yearOfPlenty', 'monopoly');
+  }
 
   const players: Player[] = seats.map((s, i) => ({
     id: s.id,
@@ -278,7 +299,7 @@ export function createGame(
   }));
 
   const bank = emptyResources();
-  for (const r of RESOURCES) bank[r] = BANK_PER_RESOURCE;
+  for (const r of RESOURCES) bank[r] = extended ? 24 : BANK_PER_RESOURCE;
 
   const state: GameState = {
     phase: 'setup',
@@ -289,6 +310,7 @@ export function createGame(
     rng,
     turn: 1,
     current: 0,
+    ...(extended ? { paired: { first: 0, secondActive: false } } : {}),
     dice: null,
     mustRoll: true,
     setup: { round: 1, placing: 'settlement', lastVertex: null },
@@ -297,6 +319,7 @@ export function createGame(
     freeRoads: 0,
     playedDevThisTurn: false,
     trade: null,
+    trades: [],
     longestRoad: { owner: null, length: 0 },
     largestArmy: { owner: null, size: 0 },
     winner: null,
@@ -460,6 +483,7 @@ export function applyAction(state: GameState, playerId: PlayerId, action: Action
   const next = structuredClone(state);
   const me = playerById(next, playerId)!;
   const result = reduce(next, me, action);
+  if (next.trades) next.trade = next.trades[0] ?? null;
   return result ?? { ok: true, state: next };
 }
 
@@ -653,7 +677,8 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
 
     case 'offerTrade': {
       if (state.phase !== 'main') return fail('You cannot trade right now.');
-      if (state.trade) return fail('An offer is already on the table.');
+      if (state.paired?.secondActive) return fail('Player 2 may trade only with the bank or harbours.');
+
 
       const give = sanitiseCounts(action.give);
       const want = sanitiseCounts(action.want);
@@ -663,21 +688,25 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
 
       const responses: Record<PlayerId, 'pending' | 'accept' | 'reject'> = {};
       for (const p of state.players) if (p.id !== me.id) responses[p.id] = 'pending';
-      state.trade = { from: me.id, give, want, responses };
+      setTrades(state, [...openTrades(state), { id: `offer-${state.turn}-${state.nextLogId}`, from: me.id, give, want, responses }]);
       addLog(state, me.id, `offers ${describe(give)} for ${describe(want)}.`);
       return;
     }
 
     case 'respondTrade': {
-      if (!state.trade) return fail('There is no offer to answer.');
-      if (state.trade.from === me.id) return fail('You cannot answer your own offer.');
-      if (action.accept && !canAfford(me, state.trade.want)) return fail('You do not hold what they want.');
-      state.trade.responses[me.id] = action.accept ? 'accept' : 'reject';
+      if (state.phase !== 'main') return fail('You cannot answer trades right now.');
+      const offer = selectedTrade(state, action.offerId);
+      if (!offer) return fail('There is no offer to answer.');
+      if (offer.from === me.id) return fail('You cannot answer your own offer.');
+      if (action.accept && !canAfford(me, offer.want)) return fail('You do not hold what they want.');
+      if (action.accept && !canAfford(playerById(state, offer.from)!, offer.give)) return fail('They no longer hold their side.');
+      offer.responses[me.id] = action.accept ? 'accept' : 'reject';
       return;
     }
 
     case 'acceptTradeWith': {
-      const offer = state.trade;
+      if (state.phase !== 'main') return fail('You cannot complete trades right now.');
+      const offer = selectedTrade(state, action.offerId);
       if (!offer) return fail('There is no offer on the table.');
       if (offer.from !== me.id) return fail('Only the player who made the offer can close it.');
       if (offer.responses[action.player] !== 'accept') return fail('That player has not accepted.');
@@ -691,31 +720,50 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
         me.resources[r] += offer.want[r] - offer.give[r];
         partner.resources[r] += offer.give[r] - offer.want[r];
       }
-      state.trade = null;
+      setTrades(state, openTrades(state).filter(o => o !== offer));
       addLog(state, me.id, `trades ${describe(offer.give)} to ${partner.name} for ${describe(offer.want)}.`);
       return;
     }
 
     case 'cancelTrade': {
-      if (!state.trade) return fail('There is no offer to withdraw.');
-      if (state.trade.from !== me.id) return fail('Only the player who made the offer can withdraw it.');
-      state.trade = null;
+      const offer = selectedTrade(state, action.offerId);
+      if (!offer) return fail('There is no offer to withdraw.');
+      if (offer.from !== me.id) return fail('Only the player who made the offer can withdraw it.');
+      setTrades(state, openTrades(state).filter(o => o !== offer));
       return;
     }
 
     // -- end of turn ----------------------------------------------------------
     case 'endTurn': {
       if (state.phase !== 'main') return fail('You cannot end your turn yet.');
-      state.trade = null;
-      state.dice = null;
+      // Victory is checked before passing control, including points gained off-turn.
+      checkWinner(state);
+      if (state.winner) return;
+      setTrades(state, []);
       state.freeRoads = 0;
       state.playedDevThisTurn = false;
       state.stealTargets = [];
-      state.mustRoll = true;
-      state.current = (state.current + 1) % state.players.length;
-      state.turn += 1;
-      state.phase = 'rolling';
-      addLog(state, currentPlayer(state).id, 'takes their turn.');
+      state.turn += 1; // Each player's portion is a separate development-card turn.
+      if (state.paired && !state.paired.secondActive) {
+        state.paired.secondActive = true;
+        state.current = (state.paired.first + 3) % state.players.length;
+        state.mustRoll = false;
+        state.phase = 'main';
+        addLog(state, currentPlayer(state).id, 'takes Player 2’s action phase (bank trades only; no roll).');
+      } else {
+        if (state.paired) {
+          state.paired.first = (state.paired.first + 1) % state.players.length;
+          state.paired.secondActive = false;
+          state.current = state.paired.first;
+        } else {
+          state.current = (state.current + 1) % state.players.length;
+        }
+        state.dice = null;
+        state.mustRoll = true;
+        state.phase = 'rolling';
+        addLog(state, currentPlayer(state).id, 'takes their turn.');
+      }
+      checkWinner(state);
       return;
     }
   }
@@ -853,8 +901,8 @@ export function legalMoves(state: GameState, playerId: PlayerId): LegalMoves {
     canOfferTrade: false,
     tradeWantMax: emptyResources(),
     mustAnswerTrade:
-      state.trade !== null && state.trade.from !== playerId && state.trade.responses[playerId] === 'pending',
-    canAcceptTrade: me !== undefined && state.trade !== null && canAfford(me, state.trade.want),
+      openTrades(state).some(o => o.from !== playerId && o.responses[playerId] === 'pending'),
+    canAcceptTrade: me !== undefined && openTrades(state).some(o => o.from !== playerId && canAfford(me, o.want)),
   };
   if (!me || state.phase === 'finished' || state.phase === 'lobby') return moves;
 
@@ -899,7 +947,7 @@ export function legalMoves(state: GameState, playerId: PlayerId): LegalMoves {
 
     case 'main': {
       moves.canEndTurn = true;
-      moves.canOfferTrade = state.trade === null;
+      moves.canOfferTrade = !state.paired?.secondActive;
       for (const p of state.players) {
         if (p.id === playerId) continue;
         for (const r of RESOURCES) moves.tradeWantMax[r] = Math.max(moves.tradeWantMax[r], p.resources[r]);

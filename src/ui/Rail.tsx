@@ -4,7 +4,7 @@ import { RESOURCE_COLOR, RESOURCE_NAME, ResourceGlyph } from '../board/icons';
 
 export function Rail({ view, me }: { view: PlayerView; me: PlayerId | null }) {
   return (
-    <aside className="rail">
+    <section className="player-strip" aria-label="Player statistics" data-count={view.players.length}>
       <div className="players">
         {view.players.map((p) => {
           const owed = view.pendingDiscards[p.id];
@@ -17,25 +17,23 @@ export function Rail({ view, me }: { view: PlayerView; me: PlayerId | null }) {
               data-active={p.id === view.currentPlayerId}
               data-offline={!p.connected}
             >
-              <span className="avatar" aria-hidden="true">
-                {p.name.slice(0, 1).toUpperCase()}
-              </span>
-              <div className="player-name">
-                {p.name}
+              <span className="avatar" aria-hidden="true" />
+              <div className="player-name" title={p.name}>
+                <span className="player-name-text">{p.name}</span>
                 {p.id === me && <span className="award">you</span>}
                 {view.longestRoad.owner === p.id && <span className="award">road</span>}
                 {view.largestArmy.owner === p.id && <span className="award">army</span>}
               </div>
-              <div className="player-vp">{p.victoryPoints}</div>
+              <div className="player-vp" title="Victory points">{p.victoryPoints}<small>VP</small></div>
               <div className="player-meta">
-                <span>
-                  <b>{p.handSize}</b> cards
+                <span title="Resource cards" aria-label={`${p.handSize} resource cards`}>
+                  <StatIcon kind="cards" /><b>{p.handSize}</b>
                 </span>
-                <span>
-                  <b>{p.devCardCount}</b> dev
+                <span title="Development cards" aria-label={`${p.devCardCount} development cards`}>
+                  <StatIcon kind="dev" /><b>{p.devCardCount}</b>
                 </span>
-                <span>
-                  <b>{p.knightsPlayed}</b> knights
+                <span title="Knights played" aria-label={`${p.knightsPlayed} knights played`}>
+                  <StatIcon kind="knights" /><b>{p.knightsPlayed}</b>
                 </span>
                 {owed ? <span style={{ color: 'var(--grain)' }}>discarding {owed}</span> : null}
                 {!p.connected && <span style={{ color: 'var(--text-faint)' }}>offline</span>}
@@ -45,6 +43,14 @@ export function Rail({ view, me }: { view: PlayerView; me: PlayerId | null }) {
         })}
       </div>
 
+    </section>
+  );
+}
+
+export function GameDetails({ view }: { view: PlayerView }) {
+  return <details className="game-details">
+    <summary>Bank &amp; log</summary>
+    <div className="game-details-panel">
       <div className="bank" aria-label="Bank">
         <span className="bank-label">Bank</span>
         {RESOURCES.map((r) => (
@@ -72,6 +78,14 @@ export function Rail({ view, me }: { view: PlayerView; me: PlayerId | null }) {
           );
         })}
       </div>
-    </aside>
-  );
+    </div>
+  </details>;
+}
+
+function StatIcon({ kind }: { kind: 'cards' | 'dev' | 'knights' }) {
+  return <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    {kind === 'cards' ? <><rect x="6" y="3" width="10" height="14" rx="2"/><path d="M4 6H3v11a2 2 0 0 0 2 2h7"/></>
+      : kind === 'dev' ? <><rect x="4" y="2" width="12" height="16" rx="2"/><path d="m10 5 1.3 3 3.2.3-2.4 2.1.7 3.1-2.8-1.6-2.8 1.6.7-3.1-2.4-2.1L8.7 8z"/></>
+      : <><path d="M5 17h11M6 15h8l-1-5 3-2-4-5-4 1-2 5 3 1-3 5Z"/><path d="M11 6h1"/></>}
+  </svg>;
 }

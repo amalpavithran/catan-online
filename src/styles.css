@@ -1354,7 +1354,7 @@ h3 {
 
 @media (max-width: 900px) {
   .game {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr auto auto;
     grid-template-areas:
       'top'
@@ -1442,3 +1442,142 @@ h3 {
   pointer-events: none;
   z-index: 80;
 }
+
+/* Keep the paired role readable without widening a phone's viewport. */
+@media (max-width: 600px) {
+  .topbar { flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; }
+  .topbar .turn-banner { flex-basis: 100%; margin-left: 0; justify-content: center; }
+  .handbar, .actions, .rail { min-width: 0; }
+}
+
+/* The island leads; status stays above it and the hand stays at the bottom. */
+.game {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: 'top' 'stats' 'board' 'hand';
+}
+.player-strip { grid-area: stats; min-width: 0; background: var(--wood); border-bottom: 1px solid var(--brass-dark); }
+.player-strip .players { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 5px 12px; border: 0; }
+.player-strip .player-card { min-width: 0; padding: 5px 8px; grid-template-columns: 6px minmax(0, 1fr) auto; gap: 3px 6px; border-radius: 4px; }
+.player-strip .avatar { width: 6px; height: 6px; grid-row: 1; box-shadow: none; animation: none; }
+.player-strip .player-name { min-width: 0; gap: 3px; font-size: 12px; }
+.player-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-strip .award { padding: 1px 3px; font-size: 9px; }
+.player-strip .player-vp { font-size: 16px; white-space: nowrap; }
+.player-vp small { margin-left: 3px; font: 9px var(--font-ui); color: var(--text-dim); }
+.player-strip .player-meta { margin: 0; gap: 10px; font-size: 11px; }
+.player-meta > span { display: inline-flex; align-items: center; gap: 3px; }
+.player-meta svg { width: 13px; height: 13px; }
+.board-stage { min-width: 0; padding: 4px; }
+.game-details { position: absolute; right: 10px; bottom: 8px; z-index: 5; font-size: 12px; }
+.game-details summary { cursor: pointer; padding: 6px 10px; border: 1px solid var(--panel-line); border-radius: 6px; background: var(--panel-well); color: var(--text-dim); }
+.game-details-panel { position: absolute; bottom: 36px; right: 0; width: min(340px, calc(100vw - 24px)); max-height: min(460px, 55dvh); overflow-y: auto; background: var(--wood); border: 1px solid var(--panel-line); border-radius: 8px; box-shadow: 0 10px 24px rgba(0,0,0,.4); }
+.game-details .log { display: block; }
+.handbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; padding: 6px 12px max(5px, env(safe-area-inset-bottom)); }
+.hand-status { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hand-status:empty { display: none; }
+.hand-status .prompt { font-size: 12px; max-width: 30ch; }
+.hand-status .dice { gap: 4px; }
+.hand-status .die { width: 25px; height: 25px; padding: 4px; gap: 2px; border-radius: 4px; }
+.hand-status .dice-total { font-size: 16px; }
+.turn-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.turn-controls .actions { margin-left: 0; min-width: 0; flex-wrap: nowrap; overflow-x: auto; gap: 6px; scrollbar-width: thin; }
+.turn-controls .actions > button, .end-turn { flex-shrink: 0; min-height: 40px; font-size: 12px; padding: 7px 10px !important; }
+.handbar .cards { grid-column: 1 / -1; justify-content: center; gap: 8px; padding: 0; }
+.handbar .card { width: 56px; height: 32px; padding: 4px 7px; border-radius: 5px; display: flex; justify-content: center; gap: 5px; transform: none; box-shadow: inset 0 0 0 1px rgba(255,252,240,.4), 0 2px 4px rgba(0,0,0,.25); }
+.handbar .cards .card + .card { margin-left: 0; }
+.handbar .card svg { width: 22px; height: 22px; flex-shrink: 0; }
+.handbar .card-count { position: static; min-width: 10px; height: auto; padding: 0; border: 0; background: transparent; color: #17120a; font: 700 14px var(--font-ui); line-height: 1; box-shadow: none; }
+.handbar .card:not([data-empty='true']):hover { transform: translateY(-2px); }
+.trade-flow { display: grid; gap: 10px; margin: 18px 0 24px; }
+.trade-transfer { display: grid; grid-template-columns: minmax(48px, 1fr) minmax(0, 2fr) 28px minmax(48px, 1fr); align-items: center; gap: 8px; padding: 12px 8px; border-radius: 6px; background: var(--sea-abyss); }
+.trade-person { min-width: 0; overflow-wrap: anywhere; font-size: 13px; font-weight: 600; }
+.trade-person:last-child { text-align: right; }
+.trade-bundle { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.trade-resource { display: flex; align-items: center; gap: 4px; padding: 5px 7px; border-radius: 5px; background: var(--resource-color); color: #17120a; }
+.trade-resource svg { width: 25px; height: 25px; }
+.trade-resource b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.trade-arrow { width: 28px; height: 24px; color: var(--brass-lit); }
+@media (max-width: 900px) {
+  .handbar { grid-template-columns: minmax(0, 1fr); }
+  .hand-status { justify-content: center; }
+  .hand-status .prompt { max-width: none; }
+  .turn-controls { justify-content: space-between; }
+  .turn-controls .actions { margin-right: auto; }
+}
+@media (max-width: 600px) {
+  .player-strip .players { padding: 4px 6px; }
+  .player-strip .player-card { padding: 4px; gap: 2px 3px; }
+  .player-strip .player-name { font-size: 10px; }
+  .player-strip .player-meta { gap: 4px; grid-column: 1 / -1; }
+  .player-strip .player-meta svg { width: 11px; height: 11px; }
+  .player-strip .player-meta b { font-size: 10px; }
+  .player-strip .player-vp { font-size: 13px; }
+  .player-strip .award { display: none; }
+  .player-strip[data-count='5'] .players, .player-strip[data-count='6'] .players { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .handbar { padding-right: 8px; padding-left: 8px; }
+  .hand-status { justify-content: flex-start; }
+  .handbar .cards { gap: 6px; }
+  .trade-transfer { gap: 5px; padding: 10px 6px; }
+  .trade-resource { padding: 4px; gap: 3px; }
+  .trade-resource svg { width: 22px; height: 22px; }
+}
+/* Direction arrows remain legible against the trade dialog's parchment. */
+.trade-arrow { color: #74501d; }
+@media (max-height: 500px) and (min-width: 601px) {
+  .topbar { padding: 4px 12px; }
+  .topbar .wordmark { font-size: 18px; }
+  .turn-banner { padding: 3px 10px; }
+  .player-strip .players { padding: 3px 8px; }
+  .player-strip .player-card { padding: 2px 6px; }
+  .handbar { grid-template-columns: auto minmax(0,1fr); gap: 3px 8px; padding-top: 3px; }
+  .turn-controls .actions > button, .end-turn { min-height: 34px; padding: 4px 8px !important; }
+  .handbar .card { height: 27px; }
+  .handbar .card svg { width: 20px; height: 20px; }
+}
+/* Discard and offline status may add a line without spilling into another seat. */
+.player-strip .player-meta { flex-wrap: wrap; row-gap: 2px; }
+
+/* SVG faces keep their pip geometry intact, even when the footer is narrow. */
+.hand-status .dice { flex-shrink: 0; gap: 6px; }
+.hand-status .die { display: block; width: 36px; height: 36px; min-width: 36px; flex: 0 0 36px; padding: 0; background: none; box-shadow: none; }
+.hand-status .dice-total { font-size: 20px; }
+.trade-overlay { position: absolute; z-index: 12; top: 8px; right: 8px; width: min(312px, calc(100% - 16px)); max-height: min(480px, calc(100% - 16px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--brass-dark); border-radius: 8px; background: var(--panel-well); color: var(--text); box-shadow: 0 8px 20px rgba(0,0,0,.35); font-size: 12px; }
+.trade-overlay-header { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--panel-line); flex-shrink: 0; }
+.trade-overlay-header > b { margin-right: auto; }
+.trade-overlay .btn { min-height: 30px; padding: 4px 9px; font-size: 12px; }
+.trade-overlay-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--brass-dark) var(--panel-well); }
+.trade-composer { padding: 8px; border-bottom: 1px solid var(--panel-line); }
+.compact-picker { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: center; gap: 6px; margin-bottom: 8px; }
+.compact-picker-resources { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 3px; }
+.compact-picker-cell { display: grid; justify-items: center; gap: 2px; padding: 4px 0; border-radius: 4px; background: var(--panel-raised); }
+.picker-resource-icon { width: 19px; height: 19px; }
+.compact-picker-cell > div { display: flex; gap: 2px; }
+.compact-picker-cell button { width: 23px; height: 28px; background: var(--panel-hover); border: 1px solid var(--panel-line); border-radius: 3px; font-size: 16px; }
+.compact-bank { margin-top: 8px; }
+.compact-bank summary { cursor: pointer; padding: 4px 0; color: var(--text-dim); }
+.bank-swap-row { display: flex; align-items: center; gap: 5px; margin: 6px 0; }
+.bank-swap-row > span:first-child, .bank-swap-row button svg { width: 20px; height: 20px; }
+.bank-swap-row button { padding: 4px !important; }
+.trade-offer-list { display: grid; gap: 6px; padding: 6px; }
+.board-trade { padding: 7px; background: var(--panel-raised); border: 1px solid var(--panel-line); border-radius: 5px; }
+.board-trade > header { display: flex; align-items: center; gap: 6px; }
+.board-trade > header > b { margin-right: auto; }
+.trade-cancel { min-width: 28px; height: 28px; border-radius: 4px; font-size: 20px; color: var(--text-dim); }
+.compact-trade-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 6px 0 9px; }
+.trade-leg { display: flex; align-items: center; gap: 4px; }
+.resource-direction { width: 19px; height: 22px; flex-shrink: 0; }
+.resource-direction.giving { color: #f57770; }
+.resource-direction.receiving { color: #83d99a; }
+.trade-overlay .trade-bundle { gap: 4px; justify-content: flex-start; }
+.trade-overlay .trade-resource { gap: 3px; padding: 3px 5px; }
+.trade-overlay .trade-resource svg { width: 20px; height: 20px; }
+.trade-overlay .trade-resource b { font-size: 13px; }
+.trade-buttons { display: flex; justify-content: flex-end; gap: 6px; }
+.trade-response { font-size: 10px; color: var(--text-dim); }
+.trade-partners { display: grid; gap: 4px; }
+.trade-partners > div { display: flex; align-items: center; gap: 6px; }
+.trade-partners > div > span:first-child { margin-right: auto; overflow-wrap: anywhere; }
+.trade-unavailable { margin: 3px 0 6px; font-size: 11px; color: var(--text-dim); }
+/* Board canvases use full-size SVGs; trade glyphs must retain their own size. */
+.trade-overlay svg.resource-direction { width: 19px; height: 22px; max-width: 19px; flex: 0 0 19px; }

@@ -20,14 +20,21 @@ function dealTerrainAndTokens(rng: Rng, scenario: Scenario): Record<HexId, HexSt
   for (let attempt = 0; attempt < 1000; attempt++) {
     const deal = scenario.fixed ? <T>(_: Rng, xs: T[]) => [...xs] : shuffle;
     const terrains = deal(rng, scenario.terrains);
-    const tokens = deal(rng, scenario.tokens);
+    const tokens = scenario.spiralTokens ?? deal(rng, scenario.tokens);
     const hexes: Record<HexId, HexState> = {};
     let t = 0;
     graphFor(scenario.id).hexes.forEach((h, i) => {
       const terrain = terrains[i];
       const producing = terrain !== 'desert' && terrain !== 'sea';
-      hexes[h] = { terrain, token: producing ? tokens[t++] : null };
+      hexes[h] = { terrain, token: producing && !scenario.spiralTokens ? tokens[t++] : null };
     });
+    if (scenario.spiralTokens) {
+      t = 0;
+      for (const h of spiralHexes(scenario)) {
+        if (hexes[h].terrain !== 'desert') hexes[h].token = tokens[t++];
+      }
+      return hexes;
+    }
     if (redTokensSeparated(hexes)) return hexes;
   }
   throw new Error('could not lay out number tokens without adjacent red tokens');
@@ -56,4 +63,29 @@ function placePorts(rng: Rng, scenario: Scenario): Port[] {
     const edgeId: EdgeId = ring[Math.round((i * ring.length) / types.length) % ring.length];
     return { type, edge: edgeId, vertices: graph.edges[edgeId].vertices };
   });
+}
+
+/** Peel the island clockwise in axial space (counterclockwise on screen).
+ * Each ring starts at its top-right corner, matching the printed A–Zc diagram.
+ */
+export function spiralHexes(scenario: Scenario): HexId[] {
+  const remaining = new Set(graphFor(scenario.id).hexes);
+  const result: HexId[] = [];
+  const directions = [[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]];
+  while (remaining.size) {
+    const ring = [...remaining].filter(h => {
+      const {q,r} = parseHexId(h);
+      return directions.some(([dq,dr]) => !remaining.has(`${q+dq},${r+dr}`));
+    });
+    const points = ring.map(h => ({h,...parseHexId(h)}));
+    const cq = points.reduce((sum,p)=>sum+p.q,0)/points.length;
+    const cr = points.reduce((sum,p)=>sum+p.r,0)/points.length;
+    const angle = (p:typeof points[number]) => Math.atan2((p.r-cr)*Math.sqrt(3)/2, p.q-cq+(p.r-cr)/2);
+    points.sort((a,b)=>angle(b)-angle(a));
+    const top = Math.min(...points.map(p=>p.r));
+    const start = points.findIndex(p=>p.r===top && p.q===Math.max(...points.filter(x=>x.r===top).map(x=>x.q)));
+    const ordered=[...points.slice(start),...points.slice(0,start)];
+    for(const p of ordered){result.push(p.h);remaining.delete(p.h);}
+  }
+  return result;
 }

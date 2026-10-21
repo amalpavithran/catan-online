@@ -110,12 +110,12 @@ describe('the in-memory room store', () => {
   });
 
   it('caps seats and closes the room once the game starts', () => {
-    const { room } = openRoom(['A', 'B', 'C', 'D']);
+    const { room } = openRoom(['A', 'B', 'C', 'D', 'E', 'F']);
     expect(room.seats).toHaveLength(MAX_SEATS);
-    expect(joinRoom(room.code, 'E', nextSocket())).toBe('That game is full.');
+    expect(joinRoom(room.code, 'G', nextSocket())).toBe('That game is full.');
 
     startGame(room, room.seats[0].playerId);
-    expect(joinRoom(room.code, 'E', nextSocket())).toBe('That game has already started.');
+    expect(joinRoom(room.code, 'G', nextSocket())).toBe('That game has already started.');
   });
 
   it('frees a seat when someone leaves the lobby, and hands the host on', () => {
@@ -138,21 +138,21 @@ describe('the in-memory room store', () => {
   });
 
   it('keeps a lobby seat through a dropped connection, and lets a newcomer take it when full', () => {
-    const { room, seats } = openRoom(['Ann', 'Bob', 'Cid', 'Dee']);
+    const { room, seats } = openRoom(['Ann', 'Bob', 'Cid', 'Dee', 'Fox', 'Gus']);
     markDisconnected(seats[0].socketId!);
-    expect(room.seats).toHaveLength(4);
+    expect(room.seats).toHaveLength(6);
     expect(room.hostId).toBe(seats[1].playerId);
     expect(seatOf(rejoinRoom(room.code, seats[0].token, nextSocket())).seat).toBe(seats[0]);
 
     markDisconnected(seats[3].socketId!);
     const eve = seatOf(joinRoom(room.code, 'Eve', nextSocket())).seat;
-    expect(room.seats.map((s) => s.name)).toEqual(['Ann', 'Bob', 'Cid', 'Eve']);
+    expect(room.seats.map((s) => s.name)).toEqual(['Ann', 'Bob', 'Cid', 'Fox', 'Gus', 'Eve']);
     expect(eve.playerId).toBe('p4');
 
     // Offline seats are dropped when the board is dealt.
     markDisconnected(seats[2].socketId!);
     expect(startGame(room, room.hostId)).toBeNull();
-    expect(room.state!.players.map((p) => p.name)).toEqual(['Ann', 'Bob', 'Eve']);
+    expect(room.state!.players.map((p) => p.name).sort()).toEqual(['Ann', 'Bob', 'Fox', 'Gus', 'Eve'].sort());
   });
 
   it('keeps a game seat when its player goes back to the menu', () => {
@@ -234,5 +234,18 @@ describe('map choice', () => {
     expect(room.state!.board.map).toBe('large');
     expect(Object.keys(room.state!.board.hexes)).toHaveLength(30);
     expect(setMap(room, seat.playerId, 'classic')).toMatch(/already started/i);
+  });
+});
+
+
+describe('six-player lobby rules', () => {
+  it.each([5, 6])('automatically selects the extension board for %i players', n => {
+    const {room, seats}=openRoom(['A','B','C','D','E','F'].slice(0,n));
+    expect(room.map).toBe('large');
+    expect(setMap(room,room.hostId,'classic')).toMatch(/require.*Large island/);
+    expect(startGame(room,seats[0].playerId)).toBeNull();
+    expect(room.state!.players).toHaveLength(n);
+    expect(room.state!.paired).toEqual({first:0,secondActive:false});
+    expect(room.state!.board.map).toBe('large');
   });
 });

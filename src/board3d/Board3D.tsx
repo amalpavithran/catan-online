@@ -35,7 +35,9 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl> 
     const aspect = size.width / size.height;
     const half = Math.tan(((FOV / 2) * Math.PI) / 180);
     // The tilt foreshortens the board's depth, so it can sit closer than a flat fit.
-    const distance = (boardRadius() * 0.98) / (half * Math.min(1, aspect));
+    // Keep the near-side docks inside the perspective frustum on phones.
+    const fit = aspect < 1 ? 1.10 : 1.02;
+    const distance = (boardRadius() * fit) / (half * Math.min(1, aspect));
     camera.position.set(0, distance * Math.cos(POLAR), distance * Math.sin(POLAR));
     camera.lookAt(0, 0, 0.25);
     const c = controls.current;

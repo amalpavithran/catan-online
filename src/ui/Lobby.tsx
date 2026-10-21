@@ -3,7 +3,7 @@ import { MAPS, isMapId } from '../../shared/scenario';
 import type { GameApi } from '../net/useGame';
 
 const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 4;
+import { MAX_PLAYERS } from '../../shared/types';
 
 export function Lobby({ api }: { api: GameApi }) {
   const room = api.room!;
@@ -46,13 +46,19 @@ export function Lobby({ api }: { api: GameApi }) {
             onChange={(e) => isMapId(e.target.value) && api.setMap(e.target.value)}
           >
             {Object.values(MAPS).map((m) => (
-              <option key={m.id} value={m.id}>
+              <option key={m.id} value={m.id} disabled={room.players.length >= 5 && m.id !== 'large'}>
                 {m.name}
               </option>
             ))}
           </select>
           <span className="lobby-hint">{MAPS[room.map].blurb}</span>
         </label>
+
+        <p className="lobby-hint">
+          {online >= 5
+            ? '5–6 players: official paired turns, 24 cards per resource and 34 development cards. Player 2 acts three seats after Player 1, without rolling or trading with players.'
+            : 'With 5–6 players, the Large island and official paired-turn rules apply automatically.'}
+        </p>
 
         {isHost ? (
           <button className="btn btn-primary" style={{ width: '100%' }} disabled={!enough} onClick={api.startGame}>

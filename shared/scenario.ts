@@ -21,6 +21,8 @@ export type Scenario = {
   ports: PortType[];
   /** Deal terrains, tokens and harbours in the order listed instead of shuffling. */
   fixed?: boolean;
+  /** Printed A–Zc token order, dealt counterclockwise inward. */
+  spiralTokens?: number[];
 };
 
 function repeat<T>(value: T, n: number): T[] {
@@ -100,6 +102,7 @@ export const LARGE: Scenario = {
   // Two each of 2 and 12, three each of 3-6 and 8-11.
   tokens: [2, 2, 12, 12, ...[3, 4, 5, 6, 8, 9, 10, 11].flatMap((n) => [n, n, n])],
   ports: [...BASE_PORTS, 'any', 'wool'],
+  spiralTokens: [2, 5, 4, 6, 3, 9, 8, 11, 11, 10, 6, 3, 8, 4, 8, 10, 11, 12, 10, 5, 4, 9, 5, 9, 12, 3, 2, 6],
 };
 
 export const MAPS: Record<MapId, Scenario> = { classic: BASE_GAME, beginner: BEGINNER, large: LARGE };

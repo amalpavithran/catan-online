@@ -1,4 +1,4 @@
-import { legalMoves, publicVictoryPoints, totalVictoryPoints, type LegalMoves } from './rules';
+import { canAfford, openTrades, legalMoves, publicVictoryPoints, totalVictoryPoints, type LegalMoves } from './rules';
 import { countResources, type BoardState, type DevCardType, type GameState, type LogEntry, type Phase, type Player, type PlayerId, type ResourceCounts, type TradeOffer } from './types';
 
 /**
@@ -24,6 +24,7 @@ export type PublicPlayer = {
 export type PlayerView = {
   phase: Phase;
   turn: number;
+  paired: GameState['paired'];
   current: number;
   currentPlayerId: PlayerId | null;
   dice: [number, number] | null;
@@ -36,6 +37,7 @@ export type PlayerView = {
   stealTargets: PlayerId[];
   freeRoads: number;
   trade: TradeOffer | null;
+  trades: (TradeOffer & { id: string; canAccept: boolean; canFulfil: boolean; canCompleteWith: PlayerId[] })[];
   longestRoad: GameState['longestRoad'];
   largestArmy: GameState['largestArmy'];
   winner: PlayerId | null;
@@ -77,6 +79,7 @@ export function viewFor(state: GameState, viewerId: PlayerId | null): PlayerView
   return {
     phase: state.phase,
     turn: state.turn,
+    paired: state.paired,
     current: state.current,
     currentPlayerId: state.players[state.current]?.id ?? null,
     dice: state.dice,
@@ -89,6 +92,14 @@ export function viewFor(state: GameState, viewerId: PlayerId | null): PlayerView
     stealTargets: state.stealTargets,
     freeRoads: state.freeRoads,
     trade: state.trade,
+    trades: openTrades(state).map(offer => {
+      const from = state.players.find(p => p.id === offer.from)!;
+      const canFulfil = canAfford(from, offer.give);
+      return { ...offer, id: offer.id ?? 'legacy', canFulfil,
+        canAccept: !!me && me.id !== offer.from && state.phase === 'main' && canFulfil && canAfford(me, offer.want),
+        canCompleteWith: state.phase === 'main' && canFulfil ? state.players.filter(p => offer.responses[p.id] === 'accept' && canAfford(p, offer.want)).map(p => p.id) : [],
+      };
+    }),
     longestRoad: state.longestRoad,
     largestArmy: state.largestArmy,
     winner: state.winner,

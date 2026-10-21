@@ -33,10 +33,10 @@ import {
   type ResourceCounts,
 } from '../shared/types';
 
-const NAMES = ['Ann', 'Bob', 'Cid', 'Dee'];
+const NAMES = ['Ann', 'Bob', 'Cid', 'Dee', 'Eve', 'Fox'];
 
 const seed = Number(process.argv[2] ?? Math.floor(Math.random() * 100000));
-const playerCount = Math.min(4, Math.max(2, Number(process.argv[3] ?? 4)));
+const playerCount = Math.min(6, Math.max(2, Number(process.argv[3] ?? 4)));
 const map = isMapId(process.argv[4]) ? process.argv[4] : 'classic';
 
 // --- helpers ---------------------------------------------------------------
@@ -313,8 +313,10 @@ if (!state.winner) {
 // Nothing should have leaked or been conjured over a whole game.
 for (const r of RESOURCES) {
   const held = state.players.reduce((n, p) => n + p.resources[r], 0);
-  if (state.bank[r] + held !== 19) console.log(`!! ${r} conservation broken: ${state.bank[r]} + ${held}`);
+  if (state.bank[r] + held !== (playerCount >= 5 ? 24 : 19)) (() => { throw new Error(`${r} conservation broken: ${state.bank[r]} + ${held}`); })();
 }
 const cards = state.devDeck.length + state.players.reduce((n, p) => n + p.devCards.length, 0);
-if (cards !== 25) console.log(`!! development deck conservation broken: ${cards}`);
+if (cards !== (playerCount >= 5 ? 34 : 25)) (() => { throw new Error(`development deck conservation broken: ${cards}`); })();
 console.log('');
+
+if (!state.winner) process.exitCode = 1;

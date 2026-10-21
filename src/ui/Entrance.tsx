@@ -3,7 +3,7 @@ import { MAPS } from '../../shared/scenario';
 import { savedSeats, type GameApi } from '../net/useGame';
 import type { RoomSummary } from '../../server/rooms';
 
-const MAX_PLAYERS = 4;
+import { MAX_PLAYERS } from '../../shared/types';
 
 /** ponytail: polls every few seconds; push over the socket if lobby churn ever matters. */
 function useLobbies(): RoomSummary[] {
