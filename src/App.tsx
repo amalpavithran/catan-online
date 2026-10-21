@@ -7,6 +7,7 @@ import { Lobby } from './ui/Lobby';
 import { GameDetails, Rail } from './ui/Rail';
 import { CardFlights } from './ui/CardFlights';
 import { detectRoll, type RollFx } from './fx/events';
+import { RoomTimer } from './ui/RoomTimer';
 import { TradesOverlay } from './ui/TradesOverlay';
 import type { PlayerView } from '../shared/redact';
 import {
@@ -91,6 +92,7 @@ function Game({ api }: { api: ReturnType<typeof useGame> }) {
             : view.moves.isMyTurn
               ? view.paired && view.phase !== 'setup' ? `Your turn · Player ${view.paired.secondActive ? 2 : 1}` : 'Your turn'
               : `${current?.name ?? 'Someone'}’s turn`}
+          <RoomTimer clock={api.room!.clock ?? null} serverNow={api.room!.serverNow} />
         </div>
       </header>
 

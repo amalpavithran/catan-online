@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type { PlayerView } from '../../shared/redact';
+import type { TimerSettings, RoomClock } from '../../shared/timers';
 import type { MapId } from '../../shared/scenario';
 import type { Action, PlayerId } from '../../shared/types';
 
@@ -8,6 +9,9 @@ export type RoomView = {
   code: string;
   hostId: PlayerId;
   started: boolean;
+  timers: TimerSettings;
+  clock: RoomClock | null;
+  serverNow: number;
   map: MapId;
   players: { id: PlayerId; name: string; connected: boolean }[];
 };
@@ -76,7 +80,7 @@ export type GameApi = {
   me: PlayerId | null;
   error: string | null;
   dismissError: () => void;
-  createRoom: (name: string) => Promise<string | null>;
+  createRoom: (name: string, timers?: TimerSettings) => Promise<string | null>;
   joinRoom: (code: string, name: string) => Promise<string | null>;
   resume: (code: string) => Promise<string | null>;
   startGame: () => void;
@@ -158,7 +162,7 @@ export function useGame(): GameApi {
     me,
     error,
     dismissError: useCallback(() => setError(null), []),
-    createRoom: useCallback((name: string) => enter('room:create', { name }), [enter]),
+    createRoom: useCallback((name: string, timers?: TimerSettings) => enter('room:create', { name, timers }), [enter]),
     joinRoom: useCallback((code: string, name: string) => enter('room:join', { code, name }), [enter]),
     resume: useCallback(
       async (code: string) => {

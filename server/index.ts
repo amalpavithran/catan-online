@@ -5,6 +5,7 @@ import express from 'express';
 import { Server, type Socket } from 'socket.io';
 import {
   act,
+  tickTimers,
   createRoom,
   enablePersistence,
   getRoom,
@@ -23,6 +24,7 @@ import {
   type Room,
   type Seat,
 } from './rooms';
+import { parseTimerSettings } from '../shared/timers';
 import type { Action } from '../shared/types';
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -58,8 +60,10 @@ function seatSocket(socket: Socket, room: Room, seat: Seat, ack?: Ack): void {
 }
 
 io.on('connection', (socket) => {
-  socket.on('room:create', ({ name }: { name?: string } = {}, ack?: Ack) => {
-    const { room, seat } = createRoom(name, socket.id);
+  socket.on('room:create', ({ name, timers }: { name?: string; timers?: unknown } = {}, ack?: Ack) => {
+    const settings = parseTimerSettings(timers);
+    if (typeof settings === 'string') return ack?.({ ok: false, error: settings });
+    const { room, seat } = createRoom(name, socket.id, settings);
     seatSocket(socket, room, seat, ack);
   });
 
@@ -107,7 +111,7 @@ io.on('connection', (socket) => {
     // The engine is the only authority: the client's opinion of legality is
     // irrelevant, and a rejected action changes nothing.
     const error = act(seated.room, seated.seat.playerId, action);
-    if (error) return socket.emit('error:message', error);
+    if (error) { socket.emit('error:message', error); broadcast(seated.room); return; }
     broadcast(seated.room);
   });
 
@@ -141,18 +145,26 @@ setInterval(() => {
   saveRooms();
 }, 15 * 60 * 1000).unref();
 
+let timerHeartbeat: ReturnType<typeof setInterval> | null = null;
+
 /** Exported so tests can run the real server on an ephemeral port. */
 export function start(port: number = PORT): Promise<number> {
   return new Promise((resolve) => {
     http.listen(port, () => {
       const address = http.address();
       const actual = typeof address === 'object' && address ? address.port : port;
+      if (!timerHeartbeat) timerHeartbeat = setInterval(() => {
+        for (const room of tickTimers()) broadcast(room);
+      }, 100);
+      timerHeartbeat.unref();
       resolve(actual);
     });
   });
 }
 
 export function stop(): Promise<void> {
+  if (timerHeartbeat) clearInterval(timerHeartbeat);
+  timerHeartbeat = null;
   return new Promise((resolve) => {
     io.close(() => resolve());
   });

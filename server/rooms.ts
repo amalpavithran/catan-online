@@ -4,6 +4,8 @@ import path from 'node:path';
 import { applyAction, createGame } from '../shared/rules';
 import { viewFor, type PlayerView } from '../shared/redact';
 import { MAPS, isMapId, type MapId } from '../shared/scenario';
+import { DEFAULT_TIMERS, LEGACY_TIMERS, parseTimerSettings, type TimerSettings, type RoomClock } from '../shared/timers';
+import { advanceClock, syncClock, finishPendingTimeout } from './timers';
 import type { Action, GameState, PlayerId } from '../shared/types';
 
 export const MAX_SEATS = 6;
@@ -26,12 +28,18 @@ export type Room = {
   map: MapId;
   state: GameState | null;
   updatedAt: number;
+  timers?: TimerSettings;
+  clock?: RoomClock | null;
+  endingTimedOutTurn?: boolean;
 };
 
 export type RoomView = {
   code: string;
   hostId: PlayerId;
   started: boolean;
+  timers: TimerSettings;
+  clock: RoomClock | null;
+  serverNow: number;
   map: MapId;
   players: { id: PlayerId; name: string; connected: boolean }[];
 };
@@ -55,6 +63,7 @@ export function enablePersistence(file: string): void {
       // Nobody is connected to a server that has just started.
       for (const seat of room.seats) seat.socketId = null;
       for (const p of room.state?.players ?? []) p.connected = false;
+      syncClock(room);
       rooms.set(room.code, room);
     }
   } catch {
@@ -100,6 +109,9 @@ export function roomView(room: Room): RoomView {
     code: room.code,
     hostId: room.hostId,
     started: room.state !== null,
+    timers: room.timers ?? LEGACY_TIMERS,
+    clock: room.clock ?? null,
+    serverNow: Date.now(),
     map: room.map,
     players: room.seats.map((s) => ({ id: s.playerId, name: s.name, connected: s.socketId !== null })),
   };
@@ -109,9 +121,11 @@ export function getRoom(code: unknown): Room | undefined {
   return typeof code === 'string' ? rooms.get(code.trim().toUpperCase()) : undefined;
 }
 
-export function createRoom(name: unknown, socketId: string): { room: Room; seat: Seat } {
+export function createRoom(name: unknown, socketId: string, settings: TimerSettings = DEFAULT_TIMERS): { room: Room; seat: Seat } {
+  const timers = parseTimerSettings(settings);
+  if (typeof timers === 'string') throw new Error(timers);
   const seat: Seat = { playerId: 'p1', token: newToken(), name: cleanName(name), socketId };
-  const room: Room = { code: newCode(), hostId: seat.playerId, seats: [seat], map: 'classic', state: null, updatedAt: Date.now() };
+  const room: Room = { code: newCode(), hostId: seat.playerId, seats: [seat], map: 'classic', state: null, updatedAt: Date.now(), timers, clock: null };
   rooms.set(room.code, room);
   return { room, seat };
 }
@@ -158,6 +172,7 @@ export function rejoinRoom(code: unknown, token: unknown, socketId: string): { r
   if (!seat) return 'That seat is not in this game.';
 
   seat.socketId = socketId;
+  syncClock(room);
   if (room.state) {
     const player = room.state.players.find((p) => p.id === seat.playerId);
     if (player) player.connected = true;
@@ -196,6 +211,7 @@ export function startGame(room: Room, playerId: PlayerId): string | null {
       text: `Opening dice (${openingRolls.join('; tie reroll: ')}). ${room.seats[0].name} starts.`});
   }
   room.updatedAt = Date.now();
+  syncClock(room);
   return null;
 }
 
@@ -211,10 +227,17 @@ export function setMap(room: Room, playerId: PlayerId, map: unknown): string | n
 
 export function act(room: Room, playerId: PlayerId, action: Action): string | null {
   if (!room.state) return 'The game has not started.';
+  const now = Date.now();
+  const expired = room.clock?.deadline !== null && room.clock?.deadline !== undefined && now >= room.clock.deadline;
+  const advanced = advanceClock(room, now);
+  if (expired && advanced) return 'The timer expired before that action arrived.';
+  const active = room.state.players[room.state.current].id;
   const result = applyAction(room.state, playerId, action);
   if (!result.ok) return result.error;
   room.state = result.state;
-  room.updatedAt = Date.now();
+  finishPendingTimeout(room);
+  syncClock(room, now, active === playerId);
+  room.updatedAt = now;
   return null;
 }
 
@@ -237,6 +260,7 @@ export function markDisconnected(socketId: string): Room[] {
       const online = room.seats.find((s) => s.socketId !== null);
       if (online) room.hostId = online.playerId;
     }
+    syncClock(room);
     touched.push(room);
   }
   return touched;
@@ -297,4 +321,11 @@ export function roomsSnapshot(): RoomSummary[] {
 /** Test seam: drop every room so one test file cannot leak into the next. */
 export function resetRooms(): void {
   rooms.clear();
+}
+
+/** Called by the server heartbeat, never by a browser-controlled timer. */
+export function tickTimers(now = Date.now()): Room[] {
+  const changed: Room[] = [];
+  for (const room of rooms.values()) if (advanceClock(room, now)) changed.push(room);
+  return changed;
 }

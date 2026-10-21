@@ -766,6 +766,8 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
       checkWinner(state);
       return;
     }
+    default:
+      return fail('Unknown action.');
   }
 }
 

@@ -20,6 +20,10 @@ export function Lobby({ api }: { api: GameApi }) {
         <div className="lobby-code">{room.code}</div>
         <p className="lobby-hint">Share this code. Up to {MAX_PLAYERS} players.</p>
 
+        <div className="room-timer-settings" aria-label="Room timer settings">
+          <span>Action: <b>{room.timers?.actionSeconds ? `${room.timers.actionSeconds}s` : 'Off'}</b></span>
+          <span>Auto-roll: <b>{room.timers?.autoRollSeconds ? `${room.timers.autoRollSeconds}s` : 'Off'}</b></span>
+        </div>
         <ul className="seat-list">
           {room.players.map((p, i) => (
             <li key={p.id} className="seat" style={{ ['--seat-color' as string]: PLAYER_COLORS[i] }}>

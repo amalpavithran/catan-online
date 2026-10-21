@@ -3,6 +3,7 @@ import { MAPS } from '../../shared/scenario';
 import { savedSeats, type GameApi } from '../net/useGame';
 import type { RoomSummary } from '../../server/rooms';
 
+import { DEFAULT_TIMERS } from '../../shared/timers';
 import { MAX_PLAYERS } from '../../shared/types';
 
 /** ponytail: polls every few seconds; push over the socket if lobby churn ever matters. */
@@ -28,6 +29,8 @@ function useLobbies(): RoomSummary[] {
 export function Entrance({ api }: { api: GameApi }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [actionSeconds, setActionSeconds] = useState(String(DEFAULT_TIMERS.actionSeconds));
+  const [autoRollSeconds, setAutoRollSeconds] = useState(String(DEFAULT_TIMERS.autoRollSeconds));
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const mine = savedSeats();
@@ -42,7 +45,7 @@ export function Entrance({ api }: { api: GameApi }) {
 
   function host(e: FormEvent) {
     e.preventDefault();
-    void run(() => api.createRoom(name));
+    void run(() => api.createRoom(name, { actionSeconds: Number(actionSeconds), autoRollSeconds: Number(autoRollSeconds) }));
   }
 
   function join(e: FormEvent) {
@@ -76,6 +79,16 @@ export function Entrance({ api }: { api: GameApi }) {
             />
           </label>
 
+          <fieldset className="timer-fields">
+            <legend>Room timers</legend>
+            <label className="field"><span className="field-label">Seconds per action</span>
+              <input type="number" inputMode="numeric" min="0" max="600" step="1" required value={actionSeconds} onChange={e=>setActionSeconds(e.target.value)} />
+            </label>
+            <label className="field"><span className="field-label">Auto-roll after (seconds)</span>
+              <input type="number" inputMode="numeric" min="0" max="60" step="1" required value={autoRollSeconds} onChange={e=>setAutoRollSeconds(e.target.value)} />
+            </label>
+            <p>0 disables a timer. Each action gets a fresh countdown; expiry ends that player's turn. Required choices are completed automatically.</p>
+          </fieldset>
           <button className="btn btn-primary" type="submit" disabled={busy || !api.connected} style={{ width: '100%' }}>
             Start a new game
           </button>

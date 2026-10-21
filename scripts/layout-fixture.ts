@@ -6,7 +6,7 @@ import { start } from '../server/index';
 enablePersistence('/tmp/catan-layout-state.json');
 const fixtures=[];
 for(const n of [4,6]){
- const {room,seat}=createRoom('Alex',`fixture-${n}-1`);const seats=[seat];
+ const {room,seat}=createRoom('Alex',`fixture-${n}-1`,{actionSeconds:0,autoRollSeconds:0});const seats=[seat];
  for(let i=1;i<n;i++){const r=joinRoom(room.code,['Alex','Maya','Robin','Jules','Luca','Nora'][i],`fixture-${n}-${i+1}`);if(typeof r==='string')throw Error(r);seats.push(r.seat);}
  startGame(room,room.hostId);
  let state=room.state!;
