@@ -1,3 +1,4 @@
+import { DiceStatistics } from './DiceStatistics';
 import { useEffect, useState } from 'react';
 import type { PlayerView } from '../../shared/redact';
 import { RESOURCES, type Action, type DevCardType, type PlayerId, type Resource, type ResourceCounts } from '../../shared/types';
@@ -276,6 +277,7 @@ const WINNER_DELAY_MS = 2600;
 
 export function WinnerModal({ view, onLeave }: { view: PlayerView; onLeave: () => void }) {
   const [shown, setShown] = useState(false);
+  const [statsOpen,setStatsOpen]=useState(false);
   useEffect(() => {
     if (!view.winner) return setShown(false);
     const quiet = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -298,14 +300,15 @@ export function WinnerModal({ view, onLeave }: { view: PlayerView; onLeave: () =
           <div className="winner">
             <div className="wordmark">{winner?.name} wins</div>
             <p className="modal-lede">Ten victory points. The island is settled.</p>
-            <ul className="scoreboard">
+            <button className="btn" aria-pressed={statsOpen} onClick={()=>setStatsOpen(!statsOpen)}>{statsOpen?'Show scores':'Dice statistics'}</button>
+            {statsOpen?<DiceStatistics stats={view.diceStats}/>:<ul className="scoreboard">
               {ranked.map((p) => (
                 <li key={p.id} style={{ ['--player-color' as string]: p.color }}>
                   <span>{p.name}</span>
                   <b>{p.victoryPoints + (p.hiddenVictoryPoints ?? 0)}</b>
                 </li>
               ))}
-            </ul>
+            </ul>}
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={onLeave}>
               Back to the start
             </button>

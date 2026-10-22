@@ -45,9 +45,7 @@ function Game({ api, atmosphere }: { api: ReturnType<typeof useGame>; atmosphere
         : 'settlement'
       : view.moves.isMyTurn && view.phase === 'movingRobber'
         ? 'robber'
-        : view.moves.isMyTurn && view.phase === 'main' && view.freeRoads > 0
-          ? 'road'
-          : null;
+        : null;
 
   const active = forced ?? pending;
 
@@ -109,7 +107,7 @@ function Game({ api, atmosphere }: { api: ReturnType<typeof useGame>; atmosphere
           pending={active}
           onVertex={(vertex) => {
             if (view.phase === 'setup') api.send({ type: 'placeSetupSettlement', vertex });
-            else if (active === 'city') api.send({ type: 'buildCity', vertex });
+            else if (view.moves.citySpots.includes(vertex)) api.send({ type: 'buildCity', vertex });
             else api.send({ type: 'buildSettlement', vertex });
             setPending(null);
           }}
@@ -129,8 +127,6 @@ function Game({ api, atmosphere }: { api: ReturnType<typeof useGame>; atmosphere
 
       <HandBar
         view={view}
-        pending={active}
-        setPending={setPending}
         onRoll={() => api.send({ type: 'rollDice' })}
         onEndTurn={() => api.send({ type: 'endTurn' })}
         onBuyDevCard={() => api.send({ type: 'buyDevCard' })}

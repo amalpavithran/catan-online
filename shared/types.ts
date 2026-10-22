@@ -104,6 +104,9 @@ export type TradeOffer = {
   from: PlayerId;
   give: ResourceCounts;
   want: ResourceCounts;
+  anyWant?: number;
+  revision?: number;
+  proposals?: Record<PlayerId, { give: ResourceCounts; want: ResourceCounts }>;
   responses: Record<PlayerId, 'pending' | 'accept' | 'reject'>;
 };
 
@@ -117,6 +120,7 @@ export type LogEntry = {
 };
 
 export type GameState = {
+  diceStats?: import('./diceStats').DiceStats;
   phase: Phase;
   players: Player[];
   board: BoardState;
@@ -167,9 +171,11 @@ export type Action =
   | { type: 'playYearOfPlenty'; resources: [Resource, Resource] }
   | { type: 'playMonopoly'; resource: Resource }
   | { type: 'bankTrade'; give: Resource; want: Resource }
-  | { type: 'offerTrade'; give: ResourceCounts; want: ResourceCounts }
-  | { type: 'respondTrade'; accept: boolean; offerId?: string }
-  | { type: 'acceptTradeWith'; player: PlayerId; offerId?: string }
+  | { type: 'offerTrade'; give: ResourceCounts; want: ResourceCounts; anyWant?: number }
+  | { type: 'editTrade'; offerId: string; give: ResourceCounts; want: ResourceCounts; anyWant?: number; revision?: number }
+  | { type: 'counterTrade'; offerId: string; give: ResourceCounts; want: ResourceCounts; revision?: number }
+  | { type: 'respondTrade'; accept: boolean; offerId?: string; revision?: number }
+  | { type: 'acceptTradeWith'; player: PlayerId; offerId?: string; revision?: number }
   | { type: 'cancelTrade'; offerId?: string }
   | { type: 'endTurn' };
 

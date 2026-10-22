@@ -99,6 +99,7 @@ function Spot({
 
 export function Spots({
   vertices,
+  cities = [],
   edges,
   hexes,
   onVertex,
@@ -106,6 +107,7 @@ export function Spots({
   onHex,
 }: {
   vertices: VertexId[];
+  cities?: VertexId[];
   edges: EdgeId[];
   hexes: HexId[];
   onVertex: (id: VertexId) => void;
@@ -151,8 +153,8 @@ export function Spots({
         return (
           <Spot
             key={v}
-            label={`vertex ${v}`}
-            position={[x, Y.tileTop + 0.03, z]}
+            label={`${cities.includes(v)?'Build city':'Build settlement'} ${v}`}
+            position={[x, Y.tileTop + (cities.includes(v)?0.7:0.03), z]}
             hit={VERTEX_HIT}
             mark={VERTEX_MARK}
             lift={0.1}

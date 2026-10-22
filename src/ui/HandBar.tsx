@@ -155,14 +155,12 @@ function prompt(view: PlayerView, owed: number): string | null {
     case 'discarding':
       return 'Waiting for everyone to discard.';
     default:
-      return view.freeRoads > 0 ? `Place ${view.freeRoads} free ${view.freeRoads === 1 ? 'road' : 'roads'}.` : view.paired?.secondActive ? 'Player 2: build, play a card, or trade with the bank. No dice roll or player trades.' : view.paired ? 'Player 1: trade and build, then pass to Player 2.' : null;
+      return view.freeRoads > 0 ? `Place ${view.freeRoads} free ${view.freeRoads === 1 ? 'road' : 'roads'}.` : view.paired?.secondActive ? 'Player 2: build, play a card, or trade with the bank. No dice roll or player trades.' : view.paired ? 'Player 1: trade and build, then pass to Player 2.' : view.moves.roadSpots.length || view.moves.settlementSpots.length || view.moves.citySpots.length ? 'Tap a highlighted edge or corner to build.' : null;
   }
 }
 
 export type HandBarProps = {
   view: PlayerView;
-  pending: Pending;
-  setPending: (p: Pending) => void;
   onRoll: () => void;
   onEndTurn: () => void;
   onBuyDevCard: () => void;
@@ -172,8 +170,6 @@ export type HandBarProps = {
 
 export function HandBar({
   view,
-  pending,
-  setPending,
   onRoll,
   onEndTurn,
   onBuyDevCard,
@@ -186,7 +182,7 @@ export function HandBar({
   const myTurn = moves.isMyTurn;
   const inMain = view.phase === 'main' && myTurn;
 
-  const toggle = (next: Exclude<Pending, null>) => setPending(pending === next ? null : next);
+
 
   return (
     <div className="handbar">
@@ -204,27 +200,6 @@ export function HandBar({
 
         {inMain && (
           <>
-            <BuildButton
-              label="Road"
-              cost={BUILD_COSTS.road}
-              active={pending === 'road'}
-              disabled={moves.roadSpots.length === 0}
-              onClick={() => toggle('road')}
-            />
-            <BuildButton
-              label="Settlement"
-              cost={BUILD_COSTS.settlement}
-              active={pending === 'settlement'}
-              disabled={moves.settlementSpots.length === 0}
-              onClick={() => toggle('settlement')}
-            />
-            <BuildButton
-              label="City"
-              cost={BUILD_COSTS.city}
-              active={pending === 'city'}
-              disabled={moves.citySpots.length === 0}
-              onClick={() => toggle('city')}
-            />
             <BuildButton
               label="Buy card"
               cost={BUILD_COSTS.devCard}

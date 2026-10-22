@@ -1,3 +1,4 @@
+import { diceStats } from './diceStats';
 import { type EdgeId, type HexId, type VertexId } from './layout';
 import { makeRng, nextInt, rollDie, shuffle } from './rng';
 import { BASE_GAME, LARGE, graphOf, type Scenario } from './scenario';
@@ -302,6 +303,7 @@ export function createGame(
   for (const r of RESOURCES) bank[r] = extended ? 24 : BANK_PER_RESOURCE;
 
   const state: GameState = {
+    diceStats: { counts: Array(13).fill(0), complete: true },
     phase: 'setup',
     players,
     board: generateBoard(rng, scenario),
@@ -478,7 +480,7 @@ export function applyAction(state: GameState, playerId: PlayerId, action: Action
 
   // Discarding blocks the table, and responding to a trade is the only thing an
   // off-turn player may ever do. Everything else is the current player's alone.
-  const offTurnAllowed = action.type === 'discard' || action.type === 'respondTrade';
+  const offTurnAllowed = action.type === 'discard' || action.type === 'respondTrade' || action.type === 'counterTrade';
   if (!offTurnAllowed && currentPlayer(state).id !== playerId) return fail('It is not your turn.');
 
   const next = structuredClone(state);
@@ -537,6 +539,8 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
       state.dice = dice;
       state.mustRoll = false;
       const total = dice[0] + dice[1];
+      state.diceStats = diceStats(state);
+      state.diceStats.counts[total]++;
       addLog(state, me.id, `rolls ${total}.`);
 
       if (total === 7) beginRobberPhase(state);
@@ -676,6 +680,7 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
       return;
     }
 
+    case 'editTrade':
     case 'offerTrade': {
       if (state.phase !== 'main') return fail('You cannot trade right now.');
       if (state.paired?.secondActive) return fail('Player 2 may trade only with the bank or harbours.');
@@ -683,14 +688,38 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
 
       const give = sanitiseCounts(action.give);
       const want = sanitiseCounts(action.want);
-      if (isEmpty(give) || isEmpty(want)) return fail('An offer needs cards on both sides.');
+      const anyWant = action.anyWant ?? 0;
+      if (!Number.isInteger(anyWant) || anyWant < 0 || anyWant > 95) return fail('Invalid any-resource count.');
+      if (isEmpty(give) || (isEmpty(want) && !anyWant)) return fail('An offer needs cards on both sides.');
       if (!RESOURCES.every((r) => me.resources[r] >= give[r])) return fail('You do not hold what you are offering.');
-      if (!state.players.some((p) => p.id !== me.id && canAfford(p, want))) return fail('Nobody holds what you want.');
+      if (!state.players.some((p) => p.id !== me.id && canAfford(p, want) && countResources(p.resources) >= countResources(want) + anyWant)) return fail('Nobody holds what you want.');
 
       const responses: Record<PlayerId, 'pending' | 'accept' | 'reject'> = {};
       for (const p of state.players) if (p.id !== me.id) responses[p.id] = 'pending';
-      setTrades(state, [...openTrades(state), { id: `offer-${state.turn}-${state.nextLogId}`, from: me.id, give, want, responses }]);
-      addLog(state, me.id, `offers ${describe(give)} for ${describe(want)}.`);
+      if (action.type === 'editTrade') {
+        const offer = selectedTrade(state, action.offerId);
+        if (!offer || offer.from !== me.id) return fail('Only the offerer may edit this trade.');
+        if (action.revision !== undefined && action.revision !== (offer.revision ?? 0)) return fail('Trade changed. Review the latest terms.');
+        Object.assign(offer, { give, want, anyWant, responses, proposals: {}, revision: (offer.revision ?? 0) + 1 });
+        addLog(state, me.id, 'updates their trade offer.');
+        return;
+      }
+      setTrades(state, [...openTrades(state), { anyWant, revision: 0, proposals: {}, id: `offer-${state.turn}-${state.nextLogId}`, from: me.id, give, want, responses }]);
+      addLog(state, me.id, `offers ${describe(give)} for ${isEmpty(want) ? `${anyWant} any resource` : `${describe(want)}${anyWant ? ` + ${anyWant} any resource` : ''}`}.`);
+      return;
+    }
+
+    case 'counterTrade': {
+      if (state.phase !== 'main' || state.paired?.secondActive) return fail('You cannot negotiate right now.');
+      const offer = selectedTrade(state, action.offerId);
+      if (!offer || offer.from === me.id) return fail('Choose another player’s offer.');
+      if (action.revision !== undefined && action.revision !== (offer.revision ?? 0)) return fail('Trade changed. Review the latest terms.');
+      const give = sanitiseCounts(action.give), want = sanitiseCounts(action.want);
+      if (isEmpty(give) || isEmpty(want)) return fail('A proposal needs cards on both sides.');
+      if (!canAfford(me, want) || !canAfford(playerById(state, offer.from)!, give)) return fail('Those cards are no longer available.');
+      offer.proposals ??= {}; offer.proposals[me.id] = { give, want };
+      offer.responses[me.id] = 'accept'; offer.revision = (offer.revision ?? 0) + 1;
+      addLog(state, me.id, 'proposes different cards for a trade.');
       return;
     }
 
@@ -699,9 +728,13 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
       const offer = selectedTrade(state, action.offerId);
       if (!offer) return fail('There is no offer to answer.');
       if (offer.from === me.id) return fail('You cannot answer your own offer.');
+      if (action.revision !== undefined && action.revision !== (offer.revision ?? 0)) return fail('Trade changed. Review the latest terms.');
+      if (action.accept && offer.anyWant) return fail('Choose concrete cards to offer for any resource.');
       if (action.accept && !canAfford(me, offer.want)) return fail('You do not hold what they want.');
       if (action.accept && !canAfford(playerById(state, offer.from)!, offer.give)) return fail('They no longer hold their side.');
+      if (offer.proposals) delete offer.proposals[me.id];
       offer.responses[me.id] = action.accept ? 'accept' : 'reject';
+      offer.revision = (offer.revision ?? 0) + 1;
       return;
     }
 
@@ -710,19 +743,23 @@ function reduce(state: GameState, me: Player, action: Action): ApplyResult | und
       const offer = selectedTrade(state, action.offerId);
       if (!offer) return fail('There is no offer on the table.');
       if (offer.from !== me.id) return fail('Only the player who made the offer can close it.');
+      if (action.revision !== undefined && action.revision !== (offer.revision ?? 0)) return fail('Trade changed. Review the latest terms.');
+      if (offer.proposals?.[action.player] && action.revision === undefined) return fail('Review the proposed cards before completing this trade.');
+      const terms = offer.proposals?.[action.player] ?? offer;
+      if (offer.anyWant && !offer.proposals?.[action.player]) return fail('Concrete resource cards are required.');
       if (offer.responses[action.player] !== 'accept') return fail('That player has not accepted.');
 
       const partner = playerById(state, action.player);
       if (!partner) return fail('Unknown player.');
-      if (!RESOURCES.every((r) => me.resources[r] >= offer.give[r])) return fail('You no longer hold your side.');
-      if (!RESOURCES.every((r) => partner.resources[r] >= offer.want[r])) return fail('They no longer hold their side.');
+      if (!RESOURCES.every((r) => me.resources[r] >= terms.give[r])) return fail('You no longer hold your side.');
+      if (!RESOURCES.every((r) => partner.resources[r] >= terms.want[r])) return fail('They no longer hold their side.');
 
       for (const r of RESOURCES) {
-        me.resources[r] += offer.want[r] - offer.give[r];
-        partner.resources[r] += offer.give[r] - offer.want[r];
+        me.resources[r] += terms.want[r] - terms.give[r];
+        partner.resources[r] += terms.give[r] - terms.want[r];
       }
       setTrades(state, openTrades(state).filter(o => o !== offer));
-      addLog(state, me.id, `trades ${describe(offer.give)} to ${partner.name} for ${describe(offer.want)}.`);
+      addLog(state, me.id, `trades ${describe(terms.give)} to ${partner.name} for ${describe(terms.want)}.`);
       return;
     }
 

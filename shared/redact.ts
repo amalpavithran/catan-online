@@ -1,3 +1,4 @@
+import { diceStats } from './diceStats';
 import { canAfford, openTrades, legalMoves, publicVictoryPoints, totalVictoryPoints, type LegalMoves } from './rules';
 import { countResources, type BoardState, type DevCardType, type GameState, type LogEntry, type Phase, type Player, type PlayerId, type ResourceCounts, type TradeOffer } from './types';
 
@@ -22,6 +23,7 @@ export type PublicPlayer = {
 };
 
 export type PlayerView = {
+  diceStats?: import('./diceStats').DiceStats;
   phase: Phase;
   turn: number;
   paired: GameState['paired'];
@@ -77,6 +79,7 @@ export function viewFor(state: GameState, viewerId: PlayerId | null): PlayerView
   const me = viewerId ? state.players.find((p) => p.id === viewerId) : undefined;
 
   return {
+    diceStats: state.winner ? diceStats(state) : undefined,
     phase: state.phase,
     turn: state.turn,
     paired: state.paired,
@@ -96,8 +99,8 @@ export function viewFor(state: GameState, viewerId: PlayerId | null): PlayerView
       const from = state.players.find(p => p.id === offer.from)!;
       const canFulfil = canAfford(from, offer.give);
       return { ...offer, id: offer.id ?? 'legacy', canFulfil,
-        canAccept: !!me && me.id !== offer.from && state.phase === 'main' && canFulfil && canAfford(me, offer.want),
-        canCompleteWith: state.phase === 'main' && canFulfil ? state.players.filter(p => offer.responses[p.id] === 'accept' && canAfford(p, offer.want)).map(p => p.id) : [],
+        canAccept: !!me && me.id !== offer.from && state.phase === 'main' && canFulfil && !offer.anyWant && canAfford(me, offer.want),
+        canCompleteWith: state.phase === 'main' ? state.players.filter(p => { const terms = offer.proposals?.[p.id] ?? offer; return offer.responses[p.id] === 'accept' && (!offer.anyWant || !!offer.proposals?.[p.id]) && canAfford(from, terms.give) && canAfford(p, terms.want); }).map(p => p.id) : [],
       };
     }),
     longestRoad: state.longestRoad,

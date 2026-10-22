@@ -101,8 +101,9 @@ export default function Board3D({ view, pending, onVertex, onEdge, onHex, roll }
   const scale = boardRadius() / 5.5;
   const colorOf = (id: string) => view.players.find((p) => p.id === id)?.color ?? '#888';
 
-  const vertexSpots = pending === 'settlement' ? moves.settlementSpots : pending === 'city' ? moves.citySpots : [];
-  const edgeSpots = pending === 'road' ? moves.roadSpots : [];
+  const autoBuild = view.phase === 'main' && moves.isMyTurn && pending === null;
+  const vertexSpots = autoBuild ? [...moves.settlementSpots, ...moves.citySpots] : pending === 'settlement' ? moves.settlementSpots : pending === 'city' ? moves.citySpots : [];
+  const edgeSpots = autoBuild || pending === 'road' ? moves.roadSpots : [];
   const hexSpots = pending === 'robber' ? moves.robberSpots : [];
 
   const resetView = useCallback(() => controls.current?.reset(), []);
@@ -164,6 +165,7 @@ export default function Board3D({ view, pending, onVertex, onEdge, onHex, roll }
 
         <Spots
           vertices={vertexSpots}
+          cities={moves.citySpots}
           edges={edgeSpots}
           hexes={hexSpots}
           onVertex={onVertex}

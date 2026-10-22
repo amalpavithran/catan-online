@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PlayerView } from '../../shared/redact';
-import { RESOURCES, emptyResources, countResources, type Action, type ResourceCounts } from '../../shared/types';
+import { RESOURCES, emptyResources, countResources, type Action, type ResourceCounts, type TradeOffer } from '../../shared/types';
 import { RESOURCE_COLOR, RESOURCE_NAME, ResourceGlyph } from '../board/icons';
 import { TradeArrow, TradeFlow } from './TradeFlow';
 
@@ -19,6 +19,8 @@ function Picker({ value, max, onChange, giving }: { value: ResourceCounts; max: 
 export function TradesOverlay({ view, send, composing, setComposing }: { view: PlayerView; send: (a: Action)=>void; composing: boolean; setComposing: (v: boolean)=>void }) {
   const [give,setGive]=useState(emptyResources);
   const [want,setWant]=useState(emptyResources);
+  const [anyWant,setAnyWant]=useState(0);
+  const [editing,setEditing]=useState<{id:string;revision:number}|null>(null);
   const [collapsed,setCollapsed]=useState(false);
   const offers=view.trades ?? [];
   const held=view.you?.resources ?? emptyResources();
@@ -30,7 +32,7 @@ export function TradesOverlay({ view, send, composing, setComposing }: { view: P
   return <section className="trade-overlay" aria-label="Board trades">
     <div className="trade-overlay-header">
       <b>Trades{offers.length ? ` (${offers.length})` : ''}</b>
-      {view.moves.canOfferTrade&&!composing&&<button className="btn" onClick={()=>setComposing(true)}>New offer</button>}
+      {view.moves.canOfferTrade&&!composing&&<button className="btn" onClick={()=>{setEditing(null);setGive(emptyResources());setWant(emptyResources());setAnyWant(0);setComposing(true);}}>New offer</button>}
       <button className="btn" aria-label={collapsed ? 'Show trades' : 'Minimize trades'} onClick={()=>{setCollapsed(!collapsed);if(!collapsed)setComposing(false);}}>{collapsed ? '+' : '−'}</button>
     </div>
     {!collapsed&&<div className="trade-overlay-content">
@@ -38,10 +40,11 @@ export function TradesOverlay({ view, send, composing, setComposing }: { view: P
         {!view.paired?.secondActive&&<>
           <Picker value={give} max={held} onChange={setGive} giving />
           <Picker value={want} max={view.moves.tradeWantMax} onChange={setWant} giving={false} />
+          <label className="any-resource-input">Any resource cards <input aria-label="Any resource cards" type="number" min="0" max="95" value={anyWant} onChange={e=>setAnyWant(Math.max(0,Math.min(95,Number(e.target.value)||0)))}/></label>
           <div className="trade-buttons"><button className="btn" onClick={()=>setComposing(false)}>Close</button>
-            <button className="btn btn-primary" disabled={!view.moves.canOfferTrade||!countResources(give)||!countResources(want)} onClick={()=>{
-              send({type:'offerTrade',give,want});setGive(emptyResources());setWant(emptyResources());setComposing(false);
-            }}>Post offer</button></div>
+            <button className="btn btn-primary" disabled={!view.moves.canOfferTrade||!countResources(give)||(!countResources(want)&&!anyWant)} onClick={()=>{
+              if(editing)send({type:'editTrade',offerId:editing.id,revision:editing.revision,give,want,anyWant});else send({type:'offerTrade',give,want,anyWant});setEditing(null);setAnyWant(0);setGive(emptyResources());setWant(emptyResources());setComposing(false);
+            }}>{editing?'Save changes':'Post offer'}</button></div>
         </>}
         <details className="compact-bank" open={view.paired?.secondActive || undefined}>
           <summary>Bank &amp; harbours</summary>
@@ -61,21 +64,40 @@ export function TradesOverlay({ view, send, composing, setComposing }: { view: P
           const response=view.you ? offer.responses[view.you.id] : undefined;
           return <article className="board-trade" key={offer.id} data-offer-id={offer.id}>
             <header><b>{mine ? 'Your offer' : from?.name ?? 'Player'}</b>
+              {mine&&<button className="btn" onClick={()=>{setGive({...offer.give});setWant({...offer.want});setAnyWant(offer.anyWant??0);setEditing({id:offer.id,revision:offer.revision??0});setComposing(true);}}>Edit</button>}
               {mine&&<button className="trade-cancel" aria-label="Withdraw this offer" onClick={()=>send({type:'cancelTrade',offerId:offer.id})}>×</button>}
-              {!mine&&response!=='pending'&&<span className="trade-response">{response==='accept'?'Accepted':'Rejected'}</span>}
+              {!mine&&response!=='pending'&&<span className="trade-response">{response==='accept'?(view.you&&offer.proposals?.[view.you.id]?'Proposed':'Accepted'):'Rejected'}</span>}
             </header>
             <TradeFlow offer={offer} mine={mine}/>
             {!offer.canFulfil&&<p className="trade-unavailable">Offerer no longer has these cards.</p>}
             {mine ? <div className="trade-partners">{view.players.filter(p=>p.id!==offer.from).map(p=><div key={p.id}>
-              <span>{p.name}</span><span className="trade-response">{offer.responses[p.id]==='accept'?'Accepted':offer.responses[p.id]==='reject'?'Rejected':'Waiting'}</span>
-              {offer.responses[p.id]==='accept'&&<button className="btn btn-primary" disabled={!offer.canCompleteWith.includes(p.id)} onClick={()=>send({type:'acceptTradeWith',player:p.id,offerId:offer.id})}>Trade</button>}
+              <span>{p.name}</span><span className="trade-response">{offer.responses[p.id]==='accept'?(offer.proposals?.[p.id]?'Proposed':'Accepted'):offer.responses[p.id]==='reject'?'Rejected':'Waiting'}</span>
+              {offer.proposals?.[p.id]&&<TradeFlow offer={{...offer,...offer.proposals[p.id],anyWant:0}} mine />}
+              {offer.responses[p.id]==='accept'&&<button className="btn btn-primary" disabled={!offer.canCompleteWith.includes(p.id)} onClick={()=>send({type:'acceptTradeWith',player:p.id,offerId:offer.id,revision:offer.revision??0})}>Trade</button>}
             </div>)}</div> : <div className="trade-buttons">
-              <button className="btn" disabled={!active||response==='reject'} onClick={()=>send({type:'respondTrade',accept:false,offerId:offer.id})}>Reject</button>
-              <button className="btn btn-primary" disabled={!offer.canAccept||response==='accept'} onClick={()=>send({type:'respondTrade',accept:true,offerId:offer.id})}>Accept</button>
+              <button className="btn" disabled={!active||response==='reject'} onClick={()=>send({type:'respondTrade',accept:false,offerId:offer.id,revision:offer.revision??0})}>Reject</button>
+              <button className="btn btn-primary" disabled={!offer.canAccept||response==='accept'} onClick={()=>send({type:'respondTrade',accept:true,offerId:offer.id,revision:offer.revision??0})}>Accept</button>
             </div>}
+            {!mine&&view.you&&offer.proposals?.[view.you.id]&&<div><b>Your proposal</b><TradeFlow offer={{...offer,...offer.proposals[view.you.id],anyWant:0}} mine={false}/></div>}
+            {!mine&&active&&<CounterOffer offer={offer} held={held} ownerHeldMax={Object.fromEntries(RESOURCES.map(r=>[r,95])) as ResourceCounts} send={send}/>}
           </article>;
         })}
       </div>
     </div>}
   </section>;
+}
+
+function CounterOffer({offer,held,ownerHeldMax,send}:{offer:TradeOffer & {id:string};held:ResourceCounts;ownerHeldMax:ResourceCounts;send:(a:Action)=>void}) {
+  const [open,setOpen]=useState(false);
+  const [give,setGive]=useState(emptyResources);
+  const [want,setWant]=useState(emptyResources);
+  const [revision,setRevision]=useState(0);
+  return <div className="counter-offer">
+    {!open?<button className="btn" onClick={()=>{setGive({...offer.want});setWant({...offer.give});setRevision(offer.revision??0);setOpen(true);}}>Choose cards / Counteroffer</button>:<>
+      <Picker value={give} max={held} onChange={setGive} giving />
+      <Picker value={want} max={ownerHeldMax} onChange={setWant} giving={false}/>
+      <div className="trade-buttons"><button className="btn" onClick={()=>setOpen(false)}>Close</button><button className="btn btn-primary" disabled={!countResources(give)||!countResources(want)||RESOURCES.some(r=>give[r]>held[r])||(offer.revision??0)!==revision} onClick={()=>{send({type:'counterTrade',offerId:offer.id,revision,give:want,want:give});setOpen(false);}}>Propose cards</button></div>
+      {(offer.revision??0)!==revision&&<p>Trade changed. Close and reopen to review the latest terms.</p>}
+    </>}
+  </div>;
 }

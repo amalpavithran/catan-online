@@ -134,8 +134,9 @@ export function Board({ view, pending, onVertex, onEdge, onHex, roll }: BoardPro
 
   const colorOf = (id: string) => view.players.find((p) => p.id === id)?.color ?? '#888';
 
-  const vertexSpots = pending === 'settlement' ? moves.settlementSpots : pending === 'city' ? moves.citySpots : [];
-  const edgeSpots = pending === 'road' ? moves.roadSpots : [];
+  const autoBuild = view.phase === 'main' && moves.isMyTurn && pending === null;
+  const vertexSpots = autoBuild ? [...moves.settlementSpots, ...moves.citySpots] : pending === 'settlement' ? moves.settlementSpots : pending === 'city' ? moves.citySpots : [];
+  const edgeSpots = autoBuild || pending === 'road' ? moves.roadSpots : [];
   const hexSpots = pending === 'robber' ? moves.robberSpots : [];
 
   // What was on the board when it appeared. Anything new, or any settlement
@@ -415,6 +416,8 @@ export function Board({ view, pending, onVertex, onEdge, onHex, roll }: BoardPro
             <g
               key={e}
               className="spot"
+              role="button" tabIndex={0} aria-label="Build road" data-build="road"
+              onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onEdge(e);}}}
               onClick={() => onEdge(e)}
               transform={`translate(${info.pos.x},${info.pos.y}) rotate(${info.angle})`}
             >
@@ -437,9 +440,10 @@ export function Board({ view, pending, onVertex, onEdge, onHex, roll }: BoardPro
         {vertexSpots.map((v) => {
           const p = g.vertices[v].pos;
           return (
-            <g key={v} className="spot" onClick={() => onVertex(v)}>
+            <g key={v} className="spot" role="button" tabIndex={0} data-build={moves.citySpots.includes(v)?'city':'settlement'} aria-label={moves.citySpots.includes(v)?'Build city':'Build settlement'} onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onVertex(v);}}} onClick={() => onVertex(v)}>
               <circle cx={p.x} cy={p.y} r="20" fill="transparent" />
-              <circle className="spot-marker" cx={p.x} cy={p.y} r="8" fill="#ffd66e" stroke="#4a3208" strokeWidth="2" />
+              <title>{moves.citySpots.includes(v)?'Upgrade to city':'Build settlement'}</title>
+              {moves.citySpots.includes(v)?<rect className="spot-marker" x={p.x-10} y={p.y-25} width="20" height="20" rx="3" fill="#b8e8ef" stroke="#173f49" strokeWidth="2"/>:<circle className="spot-marker" cx={p.x} cy={p.y} r="8" fill="#ffd66e" stroke="#4a3208" strokeWidth="2" />}
             </g>
           );
         })}
