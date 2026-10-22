@@ -404,6 +404,7 @@ function stealFrom(state: GameState, victimId: PlayerId): void {
   me.resources[taken] += 1;
   state.stealTargets = [];
   addLog(state, me.id, `steals a resource from ${victim.name}.`);
+  state.log[state.log.length - 1].steal = { from: victim.id, to: me.id };
 }
 
 /**

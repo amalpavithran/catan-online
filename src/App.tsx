@@ -7,6 +7,7 @@ import { Lobby } from './ui/Lobby';
 import { GameDetails, Rail } from './ui/Rail';
 import { CardFlights } from './ui/CardFlights';
 import { detectRoll, type RollFx } from './fx/events';
+import { useAtmosphere, AudioControls, StealFlights } from './ui/GameAtmosphere';
 import { RoomTimer } from './ui/RoomTimer';
 import { TradesOverlay } from './ui/TradesOverlay';
 import type { PlayerView } from '../shared/redact';
@@ -20,13 +21,14 @@ import {
 
 export default function App() {
   const api = useGame();
+  const atmosphere = useAtmosphere(api.view);
 
   if (!api.room) return <Entrance api={api} />;
   if (!api.room.started || !api.view) return <Lobby api={api} />;
-  return <Game api={api} />;
+  return <Game api={api} atmosphere={atmosphere} />;
 }
 
-function Game({ api }: { api: ReturnType<typeof useGame> }) {
+function Game({ api, atmosphere }: { api: ReturnType<typeof useGame>; atmosphere: ReturnType<typeof useAtmosphere> }) {
   const view = api.view!;
   const [pending, setPending] = useState<Pending>(null);
   const [showTrade, setShowTrade] = useState(false);
@@ -85,6 +87,7 @@ function Game({ api }: { api: ReturnType<typeof useGame> }) {
             {boardMode.is3d ? '2D view' : '3D view'}
           </button>
         )}
+        <AudioControls atmosphere={atmosphere} />
         <div className="turn-banner" data-mine={view.moves.isMyTurn && !view.winner}>
           <span className="turn-dot" style={{ ['--turn-color' as string]: current?.color ?? 'transparent' }} />
           {view.winner
@@ -136,6 +139,7 @@ function Game({ api }: { api: ReturnType<typeof useGame> }) {
       />
 
       <CardFlights roll={roll} me={api.me} />
+      <StealFlights entries={atmosphere.steals} view={view} done={atmosphere.done} />
 
       <DiscardModal view={view} send={api.send} />
       <StealModal view={view} send={api.send} />

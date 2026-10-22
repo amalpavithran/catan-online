@@ -108,6 +108,8 @@ export type TradeOffer = {
 };
 
 export type LogEntry = {
+  /** Public transfer endpoints only; the stolen resource stays private. */
+  steal?: { from: PlayerId; to: PlayerId };
   id: number;
   turn: number;
   player: PlayerId | null;
