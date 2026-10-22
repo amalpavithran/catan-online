@@ -21,6 +21,7 @@ export function useAtmosphere(view: PlayerView | null) {
   useEffect(()=>{engine.current?.setMusic(preferences.music && !!view);if(engine.current)engine.current.effects=preferences.effects;try{localStorage.setItem('catan.audio',JSON.stringify(preferences));}catch{}},[preferences,!!view]);
   useEffect(()=>{
     const prev=previous.current;previous.current=view;
+    if(!view){setSteals([]);return;}
     if(!prev||!view||prev.you?.id!==view.you?.id)return;
     const last=prev.log.at(-1)?.id ?? -1;
     const fresh=view.log.filter(e=>e.id>last);
