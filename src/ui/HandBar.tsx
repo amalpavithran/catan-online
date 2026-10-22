@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { PlayerView } from '../../shared/redact';
 import { BUILD_COSTS, RESOURCES, type Resource, type ResourceCounts } from '../../shared/types';
 import { RESOURCE_COLOR, RESOURCE_NAME, ResourceGlyph } from '../board/icons';
@@ -61,7 +62,7 @@ function Die({ value }: { value: number }) {
   );
 }
 
-export function Cards({ resources }: { resources: ResourceCounts }) {
+export function Cards({ resources, children }: { resources: ResourceCounts; children?: ReactNode }) {
   return (
     <div className="cards" aria-label="Your resource cards">
       {RESOURCES.map((r) => (
@@ -81,6 +82,7 @@ export function Cards({ resources }: { resources: ResourceCounts }) {
           </span>
         </div>
       ))}
+      {children}
     </div>
   );
 }
@@ -210,12 +212,6 @@ export function HandBar({
           </>
         )}
 
-        {myTurn && (view.phase === 'main' || view.phase === 'rolling') && (
-          <button className="btn" onClick={openCards} disabled={(view.you?.devCards.length ?? 0) === 0}>
-            Your cards ({view.you?.devCards.filter((c) => !c.played).length ?? 0})
-          </button>
-        )}
-
         {inMain && (
           <button className="btn" onClick={openTrade}>
             {view.paired?.secondActive ? 'Bank trade' : 'Trade'}
@@ -229,7 +225,9 @@ export function HandBar({
           </button>
         )}
       </div>
-      <Cards resources={view.you?.resources ?? { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 }} />
+      <Cards resources={view.you?.resources ?? { brick: 0, lumber: 0, wool: 0, grain: 0, ore: 0 }}>
+        {!!view.you?.devCards.some(c=>!c.played)&&<button className="card development-hand" onClick={openCards} aria-label={`Your development cards (${view.you.devCards.filter(c=>!c.played).length})`} title="Your development cards"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="4" y="2" width="12" height="16" rx="2"/><path d="m10 5 1 3 3 1-2 2 1 3-3-2-3 2 1-3-2-2 3-1z"/></svg><span className="card-count">{view.you.devCards.filter(c=>!c.played).length}</span></button>}
+      </Cards>
     </div>
   );
 }

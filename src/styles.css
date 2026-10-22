@@ -1620,3 +1620,6 @@ h3 {
 .dice-stats-table { width: 100%; font-size: 12px; border-collapse: collapse; font-variant-numeric: tabular-nums; margin-bottom: 16px; }
 .dice-stats-table th,.dice-stats-table td { padding: 4px; text-align: right; border-bottom: 1px solid var(--panel-line); }
 .spot:focus-visible .spot-marker { stroke: white; stroke-width: 3px; }
+
+.handbar .development-hand { background: #d9c8a6; color: #17120a; cursor: pointer; }
+@media (max-width: 600px) { .handbar .card { flex-shrink: 1; min-width: 0; } }
